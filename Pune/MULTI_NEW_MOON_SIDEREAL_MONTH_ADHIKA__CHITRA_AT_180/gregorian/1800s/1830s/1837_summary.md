@@ -2,7 +2,7 @@
 title = "1837 Summary"
 
 +++
-##Intro
+## Intro
 ### Computation parameters
 - 🌏**क्षेत्रम्** (पुण्यनगरी)
 
@@ -17,8 +17,8 @@ jsonClass = "ComputationSystem"
 #### Event options
  ```
 aparaahna_as_second_half = false
-prefer_eight_fold_day_division = false
 julian_handling = "converted to Gregorian"
+prefer_eight_fold_day_division = false
 jsonClass = "FestivalOptions"
 
 ```
@@ -26,4 +26,4 @@ jsonClass = "FestivalOptions"
 
 
 ## Table
-  <div class="spreadsheet" src="../1837.toml" fullHeightWithRowsPerScreen=8> </div>
+  <div class="spreadsheet" src="../1837.toml" fullHeightWithRowsPerScreen=4> </div>

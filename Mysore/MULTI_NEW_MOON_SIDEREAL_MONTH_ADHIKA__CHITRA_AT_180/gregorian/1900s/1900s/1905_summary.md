@@ -2,7 +2,7 @@
 title = "1905 Summary"
 
 +++
-##Intro
+## Intro
 ### Computation parameters
 - 🌏**क्षेत्रम्** (महिष्हपुरी)
 
@@ -26,4 +26,4 @@ jsonClass = "FestivalOptions"
 
 
 ## Table
-  <div class="spreadsheet" src="../1905.toml" fullHeightWithRowsPerScreen=8> </div>
+  <div class="spreadsheet" src="../1905.toml" fullHeightWithRowsPerScreen=4> </div>

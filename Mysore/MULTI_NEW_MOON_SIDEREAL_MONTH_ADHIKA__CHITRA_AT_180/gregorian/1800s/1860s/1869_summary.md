@@ -2,7 +2,7 @@
 title = "1869 Summary"
 
 +++
-##Intro
+## Intro
 ### Computation parameters
 - 🌏**क्षेत्रम्** (महिष्हपुरी)
 
@@ -26,4 +26,4 @@ jsonClass = "FestivalOptions"
 
 
 ## Table
-  <div class="spreadsheet" src="../1869.toml" fullHeightWithRowsPerScreen=8> </div>
+  <div class="spreadsheet" src="../1869.toml" fullHeightWithRowsPerScreen=4> </div>

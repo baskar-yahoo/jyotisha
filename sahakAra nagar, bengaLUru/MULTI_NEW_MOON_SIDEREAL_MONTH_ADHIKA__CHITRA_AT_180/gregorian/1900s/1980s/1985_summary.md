@@ -2,7 +2,7 @@
 title = "1985 Summary"
 
 +++
-##Intro
+## Intro
 ### Computation parameters
 - 🌏**क्षेत्रम्** (सहकार-नगरम्, कल्याणपुरी)
 
@@ -17,6 +17,7 @@ jsonClass = "ComputationSystem"
 #### Event options
  ```
 aparaahna_as_second_half = false
+julian_handling = "converted to Gregorian"
 prefer_eight_fold_day_division = false
 jsonClass = "FestivalOptions"
 
@@ -25,4 +26,4 @@ jsonClass = "FestivalOptions"
 
 
 ## Table
-  <div class="spreadsheet" src="../1985.toml" fullHeightWithRowsPerScreen=8> </div>
+  <div class="spreadsheet" src="../1985.toml" fullHeightWithRowsPerScreen=4> </div>
