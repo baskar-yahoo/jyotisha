@@ -5,13 +5,14 @@ import sys
 from pathlib import Path
 
 import methodtools
+import regex
 import toml
 from timebudget import timebudget
 
 from jyotisha import custom_transliteration
 from jyotisha.panchaanga.temporal import names
 from sanskrit_data.schema import common
-
+from indic_transliteration import xsanscript
 
 def transliterate_quoted_text(text, script):
   transliterated_text = text
@@ -27,6 +28,11 @@ def transliterate_quoted_text(text, script):
       logging.warning('Unmatched backquotes in string: %s' % transliterated_text)
   return transliterated_text
 
+
+def clean_id(id):
+  id = id.replace('/','__').strip('{}')
+  id = regex.sub(" +", "_", id)
+  return id
 
 
 class HinduCalendarEventTiming(common.JsonObject):
@@ -167,7 +173,7 @@ class HinduCalendarEvent(common.JsonObject):
   def get_storage_file_name_flat(self, base_dir):
     return "%(base_dir)s/%(id)s.toml"  % dict(
       base_dir=base_dir,
-      id=self.id.replace('/','__').strip('{}')
+      id=self.id
     )
 
   def get_storage_file_name_granular(self, base_dir):
@@ -175,11 +181,11 @@ class HinduCalendarEvent(common.JsonObject):
       path = "relative_event/%(anchor_festival_id)s/offset__%(offset)02d/%(id)s.toml" % dict(
         anchor_festival_id=self.timing.anchor_festival_id.replace('/','__'),
         offset=self.timing.offset,
-        id=self.id.replace('/','__').strip('{}')
+        id=self.id
       )
     elif self.timing is None or self.timing.month_number is None:
       path = "description_only/%(id)s.toml" % dict(
-        id=self.id.replace('/','__').strip('{}')
+        id=self.id
       )
     else:
       try:
@@ -188,7 +194,7 @@ class HinduCalendarEvent(common.JsonObject):
           anga_type=self.timing.anga_type,
           month_number=self.timing.month_number,
           anga_number=self.timing.anga_number,
-          id=self.id.replace('/','__').strip('{}')
+          id=self.id
         )
       except Exception:
         logging.error(str(self))
@@ -211,6 +217,27 @@ class HinduCalendarEvent(common.JsonObject):
     truncate, header_md=header_md)
 
     return final_description_string
+
+  def get_description_dict(self, script):
+    from jyotisha.panchaanga.temporal.festival.rules import summary
+
+    description_dict = {}
+
+    description_dict['blurb'] = summary.get_timing_summary(self)
+    description_dict['detailed'] = summary.get_description_str_with_shlokas(False, self, script)
+    if self.image is None:
+      description_dict['image'] = ''
+    else:
+      description_dict['image'] = self.image
+
+    description_dict['references'] = summary.get_references_md(self)
+
+    if self.shlokas is not None:
+      description_dict['shlokas'] = xsanscript.transliterate(self.shlokas.replace("\n", "  \n"), xsanscript.DEVANAGARI, script)
+    else:
+      description_dict['shlokas'] = ''
+
+    return description_dict
 
   def to_gregorian(self, julian_handling):
     if self.timing.month_type != RulesRepo.JULIAN_MONTH_DIR:
@@ -255,9 +282,6 @@ class RulesRepo(common.JsonObject):
   ISLAMIC_MONTH_DIR = "islamic"
   JULIAN_MONTH_DIR = "julian"
   RELATIVE_EVENT_DIR = "relative_event"
-  ERA_GREGORIAN = "gregorian"
-  ERA_KALI = "kali"
-  ERA_SHAKA = "shaka"
   DAY_DIR = "day"
   TITHI_DIR = "tithi"
   NAKSHATRA_DIR = "nakshatra"
@@ -272,9 +296,6 @@ class RulesRepo(common.JsonObject):
   def get_path(self):
     #  We don't set the path in __init__ so as to avoid storing machine-specific paths for canonical repos_tuple.
     return self.path if self.path is not None else os.path.join(DATA_ROOT, self.name)
-
-
-rule_repos = ()
 
 
 class RulesCollection(common.JsonObject):
@@ -310,8 +331,9 @@ class RulesCollection(common.JsonObject):
     for repo in self.repos:
       base_dir = repo.get_path()
       rules_map = get_festival_rules_map(
-        os.path.join(DATA_ROOT, repo.get_path(), julian_handling=None), repo=repo)
+        os.path.join(DATA_ROOT, repo.get_path()), repo=repo, julian_handling=None)
       for rule in rules_map.values():
+        rule.id = clean_id(rule.id)
         expected_path = rule.get_storage_file_name(base_dir=base_dir)
         if rule.path_actual != expected_path:
           logging.info(str((rule.path_actual, expected_path)))
@@ -357,6 +379,10 @@ common.update_json_class_index(sys.modules[__name__])
 # logging.debug(common.json_class_index)
 
 
+# The below is filled by load_repos() below.
+rule_repos = ()
+
+
 def dump_repos():
   repos = [repo.to_json_map() for repo in rule_repos]
   repos.sort(key=lambda x: x["name"])
@@ -365,6 +391,11 @@ def dump_repos():
 
 
 def load_repos():
+  """
+  
+  common.update_json_class_index should be called before calling this. 
+  :return: 
+  """
   global rule_repos
   with codecs.open(_ADYATITHI_REPOS_PATH, "r") as fp:
     repos = toml.load(fp)
@@ -379,5 +410,6 @@ if __name__ == '__main__':
   # dump_repos()
   rules_collection = RulesCollection.get_cached(repos_tuple=rule_repos, julian_handling=None)
   # rules_collection = RulesCollection(repos=[RulesRepo(name="mahApuruSha/xatra-later")], julian_handling=None)
-  # rules_collection.fix_filenames()
+  rules_collection.fix_filenames()
   # rules_collection.fix_content()
+

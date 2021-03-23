@@ -2,7 +2,8 @@ import logging
 import sys
 from copy import deepcopy, copy
 
-from jyotisha.panchaanga.temporal.festival.rules import RulesCollection
+from jyotisha.panchaanga.temporal.body import Graha
+from jyotisha.panchaanga.temporal.festival.rules import RulesCollection, RulesRepo
 from jyotisha.panchaanga.temporal.zodiac.angas import BoundaryAngas, Anga, AngaType
 from sanskrit_data.schema import common
 from sanskrit_data.schema.common import JsonObject
@@ -73,19 +74,38 @@ class FestivalOptions(JsonObject):
     return md
 
 
+class GrahaLopaMeasures(JsonObject):
+  def __init__(self):
+    self.graha_id_to_lopa_measure = {
+      # For Jupiter Lope Surya Siddhanta suggests angular separation of 11° on both sides of the Sun.
+      Graha.JUPITER: 11,
+      # Surya Siddhanta suggests angular separation of 10° on both sides of the Sun when Venus is in the forward motion and 8° when Venus is in the retrograde motion.
+      Graha.VENUS: 9,
+      #  Surya Siddhanta suggests angular separation of 14° on both sides of the Sun when Mercury is in the forward motion and 12° when Mercury is in the retrograde motion.
+      Graha.MERCURY: 13,
+      # Surya Siddhanta suggests angular separation of 17° on both sides of the Sun.
+      Graha.MARS: 17,
+      # Surya Siddhanta suggests angular separation of 15° on both sides of the Sun.
+      Graha.SATURN: 15,
+    }
+
+
 class ComputationSystem(JsonObject):
   MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180 = None
+  MULTI_FULL_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180 = None
   MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__RP = None
   SOLSTICE_POST_DARK_10_ADHIKA__CHITRA_180 = None
   SOLSTICE_POST_DARK_10_ADHIKA__RP = None
   MIN_SOLARCOMPUTATION__CHITRA_180 = None
   DEFAULT = None
+  TEST = None
 
   def __init__(self, lunar_month_assigner_type, ayanaamsha_id, festival_options=FestivalOptions()):
     super().__init__()
     self.lunar_month_assigner_type = lunar_month_assigner_type
     self.ayanaamsha_id = ayanaamsha_id
     self.festival_options = festival_options
+    self.graha_lopa_measures = GrahaLopaMeasures()
 
   def __repr__(self):
     return "%s__%s" % (self.lunar_month_assigner_type, self.ayanaamsha_id)
@@ -96,17 +116,31 @@ class ComputationSystem(JsonObject):
      
 
 
+def get_kauNdinyAyana_bhAskara_gRhya_computation_system():
+  computation_system = deepcopy(ComputationSystem.SOLSTICE_POST_DARK_10_ADHIKA__CHITRA_180)
+  computation_system.festival_options.repos = [RulesRepo(name="gRhya/general")]
+  computation_system.festival_options.aparaahna_as_second_half = True
+  computation_system.festival_options.prefer_eight_fold_day_division = True
+  return computation_system
+
+
 def set_constants():
   from jyotisha.panchaanga.temporal.month import LunarMonthAssigner
   from jyotisha.panchaanga.temporal.zodiac import Ayanamsha
   ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180 = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA, ayanaamsha_id=Ayanamsha.CHITRA_AT_180)
+  ComputationSystem.MULTI_FULL_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180 = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.MULTI_FULL_MOON_SIDEREAL_MONTH_ADHIKA, ayanaamsha_id=Ayanamsha.CHITRA_AT_180)
   ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__RP = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA, ayanaamsha_id=Ayanamsha.RASHTRIYA_PANCHANGA_NAKSHATRA_TRACKING)
 
   ComputationSystem.SOLSTICE_POST_DARK_10_ADHIKA__CHITRA_180 = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.SOLSTICE_POST_DARK_10_ADHIKA, ayanaamsha_id=Ayanamsha.CHITRA_AT_180)
   ComputationSystem.SOLSTICE_POST_DARK_10_ADHIKA__RP = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.SOLSTICE_POST_DARK_10_ADHIKA, ayanaamsha_id=Ayanamsha.RASHTRIYA_PANCHANGA_NAKSHATRA_TRACKING)
   ComputationSystem.MIN_SOLARCOMPUTATION__RP = ComputationSystem(lunar_month_assigner_type=None, ayanaamsha_id=Ayanamsha.RASHTRIYA_PANCHANGA_NAKSHATRA_TRACKING)
-  
+
   ComputationSystem.DEFAULT = ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180
+
+  festival_options = FestivalOptions()
+  festival_options.repos = [r for r in festival_options.repos if r.name != "mahApuruSha/xatra-later"]
+  ComputationSystem.TEST = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA, ayanaamsha_id=Ayanamsha.CHITRA_AT_180, festival_options=festival_options)
+
   
 set_constants()
 

@@ -4,11 +4,12 @@ import logging
 import sys
 from math import floor, modf
 
+import methodtools
 from scipy.optimize import brentq
 from timebudget import timebudget
 
 from jyotisha.panchaanga.spatio_temporal import City
-from jyotisha.panchaanga.temporal import time, ComputationSystem, set_constants, names
+from jyotisha.panchaanga.temporal import time, ComputationSystem, set_constants, names, era, body
 from jyotisha.panchaanga.temporal import zodiac
 from jyotisha.panchaanga.temporal.body import Graha
 from jyotisha.panchaanga.temporal.festival.rules import RulesRepo
@@ -156,6 +157,8 @@ class DailyPanchaanga(common.JsonObject):
     
     self.shraaddha_tithi = []
     self.festival_id_to_instance = {}
+    self.mauDhyas = None
+    self.amauDhyas = None
 
     self.compute_sun_moon_transitions(previous_day_panchaanga=previous_day_panchaanga)
     self.compute_solar_day_sunset(previous_day_panchaanga=previous_day_panchaanga)
@@ -165,6 +168,8 @@ class DailyPanchaanga(common.JsonObject):
     if self.computation_system.lunar_month_assigner_type is not None:
       lunar_month_assigner = LunarMonthAssigner.get_assigner(computation_system=self.computation_system)
       self.set_lunar_month_sunrise(month_assigner=lunar_month_assigner, previous_day_panchaanga=previous_day_panchaanga)
+      self.set_mauDhyas()
+
 
   def __repr__(self):
     return "%s %s" % (repr(self.date), repr(self.city))
@@ -239,6 +244,8 @@ class DailyPanchaanga(common.JsonObject):
         return getattr(self.day_length_based_periods, interval_id)
       else:
         return getattr(self.day_length_based_periods.fifteen_fold_division, interval_id)
+    elif interval_id == "julian_day":
+      return Interval(jd_start=self.julian_day_start, jd_end=self.julian_day_start + 1, name=interval_id)
     else:
       if self.computation_system.festival_options.prefer_eight_fold_day_division:
         search_locations = [self.day_length_based_periods, self.day_length_based_periods.eight_fold_division, self.day_length_based_periods.fifteen_fold_division]
@@ -301,7 +308,9 @@ class DailyPanchaanga(common.JsonObject):
   def set_lunar_month_sunrise(self, month_assigner, previous_day_panchaanga=None):
     if previous_day_panchaanga is not None:
       span = previous_day_panchaanga.sunrise_day_angas.find_anga_span(Anga.get_cached(anga_type_id=AngaType.TITHI.name, index=1))
-      if span is not None or self.sunrise_day_angas.tithi_at_sunrise.index == 1:
+
+      # If a prathamA tithi has started post-sunrise yesterday (and has potentially ended before today's sunrise), or if today we have a prathamA at sunrise
+      if (span is not None and span.jd_start is not None) or self.sunrise_day_angas.tithi_at_sunrise.index == 1:
         self.lunar_month_sunrise = month_assigner.get_month_sunrise(daily_panchaanga=self)
       else:
         self.lunar_month_sunrise = previous_day_panchaanga.lunar_month_sunrise
@@ -320,6 +329,7 @@ class DailyPanchaanga(common.JsonObject):
     elif month_type == RulesRepo.GREGORIAN_MONTH_DIR:
       return self.date
 
+  @methodtools.lru_cache(maxsize=None)
   def get_month_str(self, month_type, script):
     if month_type == RulesRepo.SIDEREAL_SOLAR_MONTH_DIR:
       return names.NAMES['RASHI_NAMES']['sa'][script][self.solar_sidereal_date_sunset.month]
@@ -332,7 +342,6 @@ class DailyPanchaanga(common.JsonObject):
       return names.NAMES["ARAB_MONTH_NAMES"]["ar"][islamic_date.month-1]
     elif month_type == RulesRepo.GREGORIAN_MONTH_DIR:
       return names.month_map[self.date.month]
-    
 
   def get_samvatsara_offset_1987(self, month_type):
     # The below is a crude variable name: sidereal lunar month could be only approximately equinox-referrent. 
@@ -350,6 +359,19 @@ class DailyPanchaanga(common.JsonObject):
       samvatsara_1987 = Anga(index=samvatsara_1987, anga_type_id=AngaType.SAMVATSARA.name)
     samvatsara = samvatsara_1987 + self.get_samvatsara_offset_1987(month_type=month_type)
     return samvatsara
+
+
+  def get_year_number(self, month_type, era_id):
+    # The below is a crude variable name: sidereal lunar month could be only approximately equinox-referrent. 
+    equinox_referrent_date = self.get_date(month_type=month_type)
+    year_0_offset = era.get_year_0_offset(era_id=era_id)
+    # For a few millennia around 1987, it is safe to assume that lunar year starts wihtin the first 5 months of the Gregorian year. This means that only the tail end of the lunar year occurs within the first few months of the year. And only in that case, would we need to offset relative to 1988 rather than 1987.  
+    if equinox_referrent_date.month >= 7 and self.date.month <= 5:
+      year_index = (self.date.year - 1 + year_0_offset)
+    else:
+      year_index = (self.date.year + year_0_offset)
+    return year_index
+
 
 
   def get_lagna_data(self, ayanaamsha_id=zodiac.Ayanamsha.CHITRA_AT_180, debug=False):
@@ -389,6 +411,36 @@ class DailyPanchaanga(common.JsonObject):
       if lagna_end_time < self.jd_next_sunrise:
         self.lagna_data.append((lagna, lagna_end_time))
     return self.lagna_data
+
+
+  def day_has_conjunction(self, body1, body2, gap=None):
+    if gap is None:
+      gap = (Graha.BODY_TO_ANGULAR_DIA_DEGREES[body1.body_name] + Graha.BODY_TO_ANGULAR_DIA_DEGREES[body2.body_name])/ 2.0
+
+    def has_collision(jd):
+      return abs(body.longitude_difference(jd=jd, body1=body1, body2=body2)) < gap
+
+    sign = lambda x: -1 if x < 0 else (1 if x > 0 else (0 if x == 0 else None))
+    return has_collision(jd=self.jd_sunrise) or has_collision(jd=self.jd_next_sunrise) or sign(body.longitude_difference(jd=self.jd_sunrise, body1=body1, body2=body2)) != sign(body.longitude_difference(jd=self.jd_next_sunrise, body1=body1, body2=body2))
+
+  def set_mauDhyas(self):
+    sun = Graha.singleton(body_name=Graha.SUN)
+    mauDhyas = {}
+    amauDhyas = {}
+
+    for graha_id in [Graha.MERCURY, Graha.VENUS, Graha.MARS, Graha.JUPITER, Graha.SATURN]:
+      graha = Graha.singleton(body_name=graha_id)
+      gap = self.computation_system.graha_lopa_measures.graha_id_to_lopa_measure.get(graha_id, None)
+
+      if self.day_has_conjunction(body1=sun, body2=graha, gap=gap):
+        mauDhyas[graha_id] = [body.longitude_difference(jd=self.jd_sunrise, body1=sun, body2=graha), body.longitude_difference(jd=self.jd_next_sunrise, body1=sun, body2=graha)]
+      else:
+        amauDhyas[graha_id] = [body.longitude_difference(jd=self.jd_sunrise, body1=sun, body2=graha), body.longitude_difference(jd=self.jd_next_sunrise, body1=sun, body2=graha)]
+
+    if len(mauDhyas) > 0:
+      self.mauDhyas = mauDhyas
+    if len(amauDhyas) > 0:
+      self.amauDhyas = amauDhyas
 
 
 # Essential for depickling to work.

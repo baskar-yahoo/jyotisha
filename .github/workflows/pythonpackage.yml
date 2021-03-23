@@ -27,6 +27,9 @@ jobs:
         with:
           submodules: 'recursive'
           fetch-depth: 1 # Because of this, you will fail to push refs to dest repo
+      # Ideally we should not do the below. Changes in a remote repo might break our tests. 
+#      - name: Submodules - pull latest
+#        run: git pull origin master --recurse-submodules
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v1
         with:
@@ -69,12 +72,11 @@ jobs:
           cd ..
       # MD files are useful for certain bots.
       - name: Deploy md
-        uses: s0/git-publish-subdir-action@develop
-        env:
-          REPO: self
-          BRANCH: generated-output
-          FOLDER: ./hugo-source/content/output
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./hugo-source/content/output
+          publish_branch: generated-output
       - name: Deploy html
         uses: peaceiris/actions-gh-pages@v3
         with:

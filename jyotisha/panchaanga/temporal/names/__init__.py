@@ -91,11 +91,25 @@ python_to_devanaagarii = {
   "nishiitha": "निशीथः",
   "raahu": "राहुकालः",
   "gulika": "गुलिककालः",
+  "raatri_gulika": "रात्रौ गुलिककालः",
   "yama": "यमघण्टः",
-  "raatri_yaama_1": "यामः प्रथमः",
+  "raatri_yama": "रात्रौ यमघण्टः",
+  "raatri_yaama": "रात्रौ यामाः",
+  "raatri_yaama_1": "रात्रौ यामः १",
+  "raatri_yaama_2": "रात्रौ यामः २",
+  "raatri_yaama_3": "रात्रौ यामः ३",
+  "raatri_yaama_4": "रात्रौ यामः ४",
+  "ahar_yaama": "अह्नि यामाः",
+  "ahar_yaama_1": "अह्नि यामः १",
+  "ahar_yaama_2": "अह्नि यामः २",
+  "ahar_yaama_3": "अह्नि यामः ३",
+  "ahar_yaama_4": "अह्नि यामः ४",
+  "shraadhaarambha_mukhya": "श्राद्धारम्भ-कालः (मुख्यः)",
+  "shraadhaarambha_gauna": "श्राद्धारम्भ-कालः (गौणः)",
+  "shraadha_kaala": "श्राद्ध-कालः",
   "shayana": "शयनकालः",
   "dinaanta": "दिनान्तम्",
-  "preceeding_arunodaya": "प्राक्तनारुणोदयः",
+  "preceding_arunodaya": "प्राक्तनारुणोदयः",
   "maadhyaahnika_sandhyaa": "माध्याह्निकसन्ध्यावन्दनकालः",
   "puurvaahna": "पूर्वाह्णः",
   "raatrimaana": "रात्रिमानम्",
@@ -103,6 +117,36 @@ python_to_devanaagarii = {
   "sunrise": "सूर्योदयः",
   "sunset": "सूर्यास्तमयः",
   "moonrise": "चन्द्रोदयः",
+  "raudra" : "रौद्रः",
+  "chaitra" : "चैत्रः",
+  "maitra" : "मैत्रः",
+  "saalakata" : "सालकटः",
+  "saavitra" : "सावित्रः",
+  "jayanta" : "जयन्तः",
+  "gaandharva" : "गान्धर्वः",
+  "kutapa" : "कुतपः",
+  "rauhina" : "रौहिणः",
+  "virinchi" : "विरिञ्चिः",
+  "vijaya" : "विजयः",
+  "nairrita" : "नैर्‌ऋतः",
+  "mahendra" : "महेन्द्रः",
+  "varuna" : "वरुणः",
+  "bodha" : "बोधः",
+  "shankara" : "शङ्करः",
+  "ajapaat" : "अजपात्",
+  "ahirbudhnya" : "अहिर्बुध्न्यः",
+  "puushaka" : "पूषकः",
+  "aashvina" : "आश्विनः",
+  "yaamyava" : "याम्यः",
+  "aahneya" : "आह्नेयः",
+  "vaidhaatra" : "वैधात्रः",
+  "chaandra" : "चान्द्रः",
+  "aaditeya" : "आदितेयः",
+  "jaiva" : "जैवः",
+  "vaishnava" : "वैष्णवः",
+  "saura" : "सौरः",
+  "succeeding_braahma" : "ब्राह्मः",
+  "naabhasvata" : "नाभस्वतः",  
 } 
 
 devanaagarii_to_python = {python_to_devanaagarii[x]: x for x in python_to_devanaagarii }
@@ -118,3 +162,17 @@ def translate_or_transliterate(text, script, source_script=xsanscript.HK):
       return jyotisha.custom_transliteration.tr(text, script, source_script=source_script)
   else:
     return jyotisha.custom_transliteration.tr(text, script, source_script=source_script)
+
+def get_tipu_month_str(month):
+  """
+  
+  Reference: https://toshkhana.wordpress.com/2014/09/19/dawn-of-a-new-era-tipu-sultan-and-his-mauludi-calendar/
+  :param month: 
+  :return: 
+  """
+  if month == int(month):
+    month_str = " / ".join([NAMES["TIPU_ABJAD_MONTH_NAMES"]["fa"][int(month) - 1], NAMES["TIPU_ABTATH_MONTH_NAMES"]["fa"][int(month) - 1]])
+    return month_str
+  else:
+    month_str = " / ".join([NAMES["TIPU_ABJAD_MONTH_NAMES"]["fa"][int(month)], NAMES["TIPU_ABTATH_MONTH_NAMES"]["fa"][int(month)]])
+    return "%s (adhika)" % (month_str)
