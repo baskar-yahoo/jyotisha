@@ -5,6 +5,7 @@ import methodtools
 from jyotisha.panchaanga.temporal import names
 
 from sanskrit_data.schema import common
+from indic_transliteration import sanscript
 
 NAME_TO_TYPE = {}
 
@@ -75,7 +76,7 @@ AngaType.RASHI = AngaType(name='RASHI', name_hk="rAshiH", num_angas=12, weight_m
 AngaType.YOGA = AngaType(name='YOGA', name_hk="yOgaH", num_angas=27, weight_moon=1, weight_sun=1, mean_period_days=29.541)
 AngaType.KARANA = AngaType(name='KARANA', name_hk="karaNam", num_angas=60, weight_moon=1, weight_sun=-1, mean_period_days=29.4)
 AngaType.DEGREE = AngaType(name='DEGREE', name_hk=None, num_angas=360, weight_moon=None, weight_sun=None)
-AngaType.SIDEREAL_MONTH = AngaType(name='SIDEREAL_MONTH', name_hk="rAshi-mAsaH", num_angas=12, weight_moon=0, weight_sun=1, mean_period_days=365.242)
+AngaType.SIDEREAL_MONTH = AngaType(name='SIDEREAL_MONTH', name_hk="rAzi-mAsaH", num_angas=12, weight_moon=0, weight_sun=1, mean_period_days=365.242)
 AngaType.TROPICAL_MONTH = AngaType(name='TROPICAL_MONTH', name_hk="Artava-mAsaH", num_angas=12, weight_moon=0, weight_sun=1, mean_period_days=365.242)
 AngaType.SOLAR_NAKSH = AngaType(name='SOLAR_NAKSH', name_hk="saura-nakSatram", num_angas=27, weight_moon=0, weight_sun=1, mean_period_days=365.242)
 AngaType.SOLAR_NAKSH_PADA = AngaType(name='SOLAR_NAKSH_PADA', name_hk="saura-nakSatra-pAdaH", num_angas=108, weight_moon=0, weight_sun=1, mean_period_days=365.242)
@@ -93,7 +94,7 @@ class Anga(common.JsonObject):
   def get_cached(self, index, anga_type_id):
     return Anga(index=index, anga_type_id=anga_type_id)
 
-  def get_name(self, script="hk"):
+  def get_name(self, script=sanscript.roman.HK_DRAVIDIAN):
     name_dict = NAME_TO_TYPE[self.anga_type_id].names_dict
     if self.anga_type_id == AngaType.SIDEREAL_MONTH.name:
       return names.get_chandra_masa(month=self.index, script=script)

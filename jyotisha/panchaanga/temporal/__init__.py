@@ -50,9 +50,22 @@ def get_2_day_interval_boundary_angas(kaala, anga_type, p0, p1):
 
 
 class FestivalOptions(JsonObject):
-  def __init__(self, set_lagnas=None, no_fests=None, fest_repos=None, fest_ids_included_unimplemented=None, fest_ids_excluded_unimplemented=None, aparaahna_as_second_half=False, prefer_eight_fold_day_division=False, julian_handling=RulesCollection.JULIAN_TO_GREGORIAN):
+  def __init__(self, set_lagnas=None, no_fests=None, fest_repos=None, fest_ids_included_unimplemented=None, fest_ids_excluded_unimplemented=None, aparaahna_as_second_half=False, prefer_eight_fold_day_division=False, set_pancha_paxi_activities=None, julian_handling=RulesCollection.JULIAN_TO_GREGORIAN):
+    """
+    
+    :param set_lagnas: 
+    :param no_fests: 
+    :param fest_repos: 
+    :param fest_ids_included_unimplemented: TODO: rename when actually implemented 
+    :param fest_ids_excluded_unimplemented:  TODO: rename when actually implemented 
+    :param aparaahna_as_second_half: 
+    :param prefer_eight_fold_day_division: 
+    :param set_pancha_paxi_activities: 
+    :param julian_handling: 
+    """
     super().__init__()
     self.set_lagnas = set_lagnas
+    self.set_pancha_paxi_activities = set_pancha_paxi_activities
     self.aparaahna_as_second_half = aparaahna_as_second_half
     self.no_fests = no_fests
     from jyotisha.panchaanga.temporal.festival import rules
@@ -118,7 +131,7 @@ class ComputationSystem(JsonObject):
 
 def get_kauNdinyAyana_bhAskara_gRhya_computation_system():
   computation_system = deepcopy(ComputationSystem.SOLSTICE_POST_DARK_10_ADHIKA__CHITRA_180)
-  computation_system.festival_options.repos = [RulesRepo(name="gRhya/general")]
+  computation_system.festival_options.repos = [RulesRepo(name="gRhya/general"), RulesRepo(name="gRhya/Apastamba")]
   computation_system.festival_options.aparaahna_as_second_half = True
   computation_system.festival_options.prefer_eight_fold_day_division = True
   return computation_system
@@ -138,7 +151,7 @@ def set_constants():
   ComputationSystem.DEFAULT = ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180
 
   festival_options = FestivalOptions()
-  festival_options.repos = [r for r in festival_options.repos if r.name != "mahApuruSha/xatra-later"]
+  festival_options.repos = [r for r in festival_options.repos if r.name not in ["mahApuruSha/xatra-later", "mahApuruSha/sci-tech", "mahApuruSha/general-indic-non-tropical"]]
   ComputationSystem.TEST = ComputationSystem(lunar_month_assigner_type=LunarMonthAssigner.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA, ayanaamsha_id=Ayanamsha.CHITRA_AT_180, festival_options=festival_options)
 
   

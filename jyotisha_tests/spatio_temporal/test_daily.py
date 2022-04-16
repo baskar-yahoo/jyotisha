@@ -2,7 +2,7 @@ import logging
 import os
 
 import numpy.testing
-from indic_transliteration import xsanscript
+from indic_transliteration import sanscript
 
 from jyotisha.panchaanga.spatio_temporal import City
 from jyotisha.panchaanga.spatio_temporal import daily
@@ -43,7 +43,7 @@ def test_solar_day():
     city=chennai, julian_day=time.utc_gregorian_to_jd(Date(2018, 1, 14)))
   assert panchaanga.solar_sidereal_date_sunset.day == 1
   assert panchaanga.solar_sidereal_date_sunset.month == 10
-  assert panchaanga.solar_sidereal_date_sunset.month_transition == 2458132.8291680976
+  numpy.testing.assert_approx_equal(panchaanga.solar_sidereal_date_sunset.month_transition, 2458132.8291680976)
 
   panchaanga = daily.DailyPanchaanga.from_city_and_julian_day(
     city=chennai, julian_day=time.utc_gregorian_to_jd(Date(2018, 2, 12)))
@@ -114,6 +114,14 @@ def test_get_anga_data_1981_12_23():
   assert angas == [16, 17]
 
 
+def test_get_pancha_paxi_activities():
+  city = City.get_city_from_db('Chennai')
+  from jyotisha.panchaanga.temporal import zodiac
+  panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2022, month=1, day=2))
+  paxi_activities = panchaanga.get_pancha_paxi_activities()
+  assert paxi_activities.cock[0].name == 1
+  assert paxi_activities.cock[23].name == 4
+
 def test_get_lagna_data():
   city = City.get_city_from_db('Chennai') 
   from jyotisha.panchaanga.temporal import zodiac
@@ -131,14 +139,14 @@ def test_get_lagna_data():
 def test_get_samvatsara():
   city = City.get_city_from_db('Bangalore')
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2019, month=9, day=10))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "विकारी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "विकारी"
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2020, month=2, day=10))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "विकारी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "विकारी"
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2020, month=4, day=10))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "शार्वरी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.LUNAR_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "शार्वरी"
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2020, month=4, day=10))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.TROPICAL_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "शार्वरी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.TROPICAL_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "शार्वरी"
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2020, month=4, day=10))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.SIDEREAL_SOLAR_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "विकारी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.SIDEREAL_SOLAR_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "विकारी"
   panchaanga = daily.DailyPanchaanga(city=city, date=Date(year=2020, month=4, day=20))
-  assert panchaanga.get_samvatsara(month_type=RulesRepo.SIDEREAL_SOLAR_MONTH_DIR).get_name(script=xsanscript.DEVANAGARI) == "शार्वरी"
+  assert panchaanga.get_samvatsara(month_type=RulesRepo.SIDEREAL_SOLAR_MONTH_DIR).get_name(script=sanscript.DEVANAGARI) == "शार्वरी"

@@ -4,6 +4,9 @@ import logging
 import sys
 from math import floor, modf
 
+from jyotisha.panchaanga.temporal.festival.rules import pancha_paxi
+from indic_transliteration import sanscript
+
 import methodtools
 from scipy.optimize import brentq
 from timebudget import timebudget
@@ -13,7 +16,7 @@ from jyotisha.panchaanga.temporal import time, ComputationSystem, set_constants,
 from jyotisha.panchaanga.temporal import zodiac
 from jyotisha.panchaanga.temporal.body import Graha
 from jyotisha.panchaanga.temporal.festival.rules import RulesRepo
-from jyotisha.panchaanga.temporal.interval import DayLengthBasedPeriods, Interval
+from jyotisha.panchaanga.temporal.interval import DayLengthBasedPeriods, Interval, get_interval
 from jyotisha.panchaanga.temporal.month import LunarMonthAssigner
 from jyotisha.panchaanga.temporal.names import translate_or_transliterate
 from jyotisha.panchaanga.temporal.time import Timezone, Date, BasicDate, Hour
@@ -44,6 +47,7 @@ class DayAngas(common.JsonObject):
     self.karanas_with_ends = None
     self.solar_nakshatras_with_ends = None
     self.raashis_with_ends = None
+    self.solar_raashis_with_ends = None
 
   def get_angas_with_ends(self, anga_type):
     anga_spans = []
@@ -59,6 +63,8 @@ class DayAngas(common.JsonObject):
       anga_spans = self.karanas_with_ends
     elif anga_type == AngaType.SOLAR_NAKSH:
       anga_spans = self.solar_nakshatras_with_ends
+    elif anga_type == AngaType.SIDEREAL_MONTH:
+      anga_spans = self.solar_raashis_with_ends
     return anga_spans
 
   def find_anga_span(self, anga):
@@ -102,7 +108,8 @@ class DayAngas(common.JsonObject):
 
   def get_anga_data_str(self, anga_type, script, reference_jd):
     anga_data_str = ''
-    for anga_span in self.get_angas_with_ends(anga_type=anga_type):
+    angas_with_ends = self.get_angas_with_ends(anga_type=anga_type)
+    for anga_span in angas_with_ends:
       (anga_ID, anga_end_jd) = (anga_span.anga.index, anga_span.jd_end)
       anga = anga_type.names_dict[script][anga_ID]
       if anga_end_jd is None:
@@ -114,6 +121,23 @@ class DayAngas(common.JsonObject):
                         anga_end_str)
     anga_data_str = '**%s** — %s' % (translate_or_transliterate(anga_type.name_hk, script), anga_data_str[2:])
     return anga_data_str
+
+
+class PaxiActivities(common.JsonObject):
+  def __init__(self):
+    super().__init__()
+    self.cock = []
+    self.crow = []
+    self.owl = []
+    self.peacock = []
+    self.vulture = []
+
+  def add_activity_interval(self, bird, activity_interval):
+    activity_intervals = getattr(self, bird)
+    if len(activity_intervals) > 0 and activity_intervals[-1].name == activity_interval.name:
+      activity_intervals[-1].jd_end = activity_interval.jd_end
+    else:
+      activity_intervals.append(activity_interval)
 
 
 # This class is not named Panchangam in order to be able to disambiguate from annual.Panchangam in serialized objects.
@@ -148,6 +172,7 @@ class DailyPanchaanga(common.JsonObject):
 
     self.lagna_data = None
     self.sunrise_day_angas = None
+    self.paxi_activities = None
 
     self.solar_sidereal_date_sunset = None
 
@@ -170,6 +195,8 @@ class DailyPanchaanga(common.JsonObject):
       self.set_lunar_month_sunrise(month_assigner=lunar_month_assigner, previous_day_panchaanga=previous_day_panchaanga)
       self.set_mauDhyas()
 
+    if self.computation_system.festival_options.set_pancha_paxi_activities:
+      self.get_pancha_paxi_activities()
 
   def __repr__(self):
     return "%s %s" % (repr(self.date), repr(self.city))
@@ -227,6 +254,8 @@ class DailyPanchaanga(common.JsonObject):
       self.sunrise_day_angas.karanas_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.KARANA).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
       
       self.sunrise_day_angas.raashis_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.RASHI).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
+      self.sunrise_day_angas.solar_raashis_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.SIDEREAL_MONTH).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
+      
       self.sunrise_day_angas.solar_nakshatras_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.SOLAR_NAKSH).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
 
   def get_interval(self, interval_id):
@@ -330,9 +359,12 @@ class DailyPanchaanga(common.JsonObject):
       return self.date
 
   @methodtools.lru_cache(maxsize=None)
-  def get_month_str(self, month_type, script):
+  def get_month_str(self, month_type, script, language=None):
     if month_type == RulesRepo.SIDEREAL_SOLAR_MONTH_DIR:
-      return names.NAMES['RASHI_NAMES']['sa'][script][self.solar_sidereal_date_sunset.month]
+      if language is None:
+        return names.NAMES['RASHI_NAMES']['sa'][script][self.solar_sidereal_date_sunset.month]
+      else:
+        return translate_or_transliterate(names.NAMES['SIDEREAL_SOLAR_MONTH_NAMES'][language][self.solar_sidereal_date_sunset.month - 1], source_script=sanscript.DEVANAGARI, script=script)
     elif month_type == RulesRepo.LUNAR_MONTH_DIR:
       return names.get_chandra_masa(month=self.lunar_month_sunrise.index, script=script)
     elif month_type == RulesRepo.TROPICAL_MONTH_DIR:
@@ -373,6 +405,41 @@ class DailyPanchaanga(common.JsonObject):
     return year_index
 
 
+  def get_hora_data(self, debug=False):
+    """Returns the hora data
+
+        Args:
+          debug
+
+        Returns:
+          tuples detailing the end time of each hora, beginning with the one
+          prevailing at sunrise
+        """
+    if self.hora_data is not None:
+      return self.hora_data
+
+    self.hora_data = []
+    if getattr(self, "jd_sunrise", None) is None or self.jd_sunrise is None:
+      self.compute_sun_moon_transitions()
+    
+    HORA_SUNRISE = [Graha.SUN, Graha.MOON, Graha.MARS, Graha.MERCURY, Graha.JUPITER, Graha.VENUS, Graha.SATURN]
+    # HORA_GRAHAS = [Graha.SUN, Graha.VENUS, Graha.MERCURY, Graha.MOON, Graha.SATURN, Graha.JUPITER, Graha.MARS]
+    HORA_GRAHAS = (HORA_SUNRISE * 5)[0::5]
+
+    hora_sunrise = HORA_SUNRISE[self.date.get_weekday()]
+
+    hora_list = [(x + HORA_GRAHAS.index(hora_sunrise)) % 7 for x in range(24)]
+
+    for i, hora in enumerate(hora_list[:12]):
+      hora_end_time = get_interval(start_jd=self.jd_sunrise, end_jd=self.jd_sunset, part_index=i, num_parts=12).jd_end
+      self.hora_data.append((hora, HORA_GRAHAS[hora], hora_end_time))
+
+    for i, hora in enumerate(hora_list[12:]):
+      hora_end_time = get_interval(start_jd=self.jd_sunset, end_jd=self.jd_next_sunrise, part_index=i, num_parts=12).jd_end
+      self.hora_data.append((hora, HORA_GRAHAS[hora], hora_end_time))
+
+    return self.hora_data
+
 
   def get_lagna_data(self, ayanaamsha_id=zodiac.Ayanamsha.CHITRA_AT_180, debug=False):
     """Returns the lagna data
@@ -412,6 +479,28 @@ class DailyPanchaanga(common.JsonObject):
         self.lagna_data.append((lagna, lagna_end_time))
     return self.lagna_data
 
+
+  def get_pancha_paxi_activities(self):
+    if self.paxi_activities is not None:
+      return self.paxi_activities
+    self.paxi_activities = PaxiActivities()
+    from jyotisha.panchaanga.temporal.festival import rules
+    paxa_id = int((self.sunrise_day_angas.tithi_at_sunrise.index - 1) / 15) + 1
+    activities_table = pancha_paxi.get_activities_table(weekday_id=self.date.get_weekday(), paxa_id=paxa_id)
+
+    from jyotisha.panchaanga.temporal import interval   
+    for bird in ["cock", "crow", "owl", "peacock", "vulture"]:
+      activities = activities_table[bird]
+      
+      for i in range(0, 120):
+        activity_interval = interval.get_interval(start_jd=self.jd_sunrise, end_jd=self.jd_sunset, num_parts=120, part_index=i, name=activities[i])
+        self.paxi_activities.add_activity_interval(bird=bird, activity_interval=activity_interval)
+      
+      for i in range(120, 240):
+        activity_interval = interval.get_interval(start_jd=self.jd_sunset, end_jd=self.jd_next_sunrise, num_parts=120, part_index=i - 120, name=activities[i])
+        self.paxi_activities.add_activity_interval(bird=bird, activity_interval=activity_interval)
+    
+    return self.paxi_activities
 
   def day_has_conjunction(self, body1, body2, gap=None):
     if gap is None:

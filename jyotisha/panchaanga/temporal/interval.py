@@ -5,7 +5,7 @@ from numbers import Number
 
 import methodtools
 
-from indic_transliteration import xsanscript
+from indic_transliteration import sanscript
 from jyotisha.panchaanga.temporal import names
 from jyotisha.util import default_if_none
 from sanskrit_data.schema import common
@@ -39,18 +39,18 @@ class Interval(common.JsonObject):
     return "%s: (%s, %s)" % (default_if_none(self.name, "?"), default_if_none(time.ist_timezone.julian_day_to_local_time_str(jd=self.jd_start), "?"),
 default_if_none(time.ist_timezone.julian_day_to_local_time_str(jd=self.jd_end), "?"))
 
-  def to_hour_tex(self, tz, script, reference_date=None):
+  def to_hour_tex(self, tz, script, reference_date=None, time_format='hh:mm'):
     if self.jd_start is not None:
-      start_time = '~%s' % default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_start).get_hour_str(reference_date=reference_date), "")
+      start_time = '~%s' % default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_start).get_hour_str(reference_date=reference_date, format=time_format), "")
     else:
       start_time = ''
     if self.jd_end is not None:
-      end_time = '%s' % default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_end).get_hour_str(reference_date=reference_date), "")
+      end_time = '%s' % default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_end).get_hour_str(reference_date=reference_date, format=time_format), "")
     else:
       end_time = ''
     return "%s\\RIGHTarrow{}%s" % (start_time, end_time)
 
-  def to_hour_text(self, tz, script=xsanscript.IAST, reference_date=None):
+  def to_hour_text(self, tz, script=sanscript.ISO, reference_date=None):
     if self.jd_start is not None:
       start_time = '%s' % default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_start).get_hour_str(reference_date=reference_date), "")
     else:
@@ -60,10 +60,10 @@ default_if_none(time.ist_timezone.julian_day_to_local_time_str(jd=self.jd_end), 
     else:
       end_time = ''
     hour_text = "%s►%s" % (start_time, end_time)
-    return xsanscript.transliterate(hour_text, _from=xsanscript.IAST, _to=script)
+    return sanscript.transliterate(hour_text, _from=sanscript.ISO, _to=script)
 
   def to_hour_md(self, tz, script, reference_date=None):
-    name = names.translate_or_transliterate(text=self.name, source_script=xsanscript.DEVANAGARI, script=script)
+    name = names.translate_or_transliterate(text=self.name, source_script=sanscript.DEVANAGARI, script=script)
     return "**%s**—%s-%s" % (name, default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_start).get_hour_str(reference_date=reference_date), "?"),
                              default_if_none(tz.julian_day_to_local_time(julian_day=self.jd_end).get_hour_str(reference_date=reference_date), "?"))
 
@@ -111,7 +111,7 @@ class FifteenFoldDivision(common.JsonObject):
   "दे॒वस्य॑ सवि॒तुᳶ प्रा॒तᳶ प्र॑स॒वᳶ प्रा॒णः" इत्यादेर् ब्राह्मणस्य भाष्ये सायणो विभागम् इमम् इच्छति।(See comments under TbSayanaMuhuurta.)
   
   """
-  def __init__(self, jd_previous_sunset, jd_sunrise, jd_sunset, jd_next_sunrise):
+  def __init__(self, jd_previous_sunset, jd_sunrise, jd_sunset, jd_next_sunrise, weekday):
     super(FifteenFoldDivision, self).__init__()
     self.preceding_arunodaya = get_interval(start_jd=jd_previous_sunset, end_jd=jd_sunrise, part_index=[13, 14], num_parts=15)
     # Technically, the following is preceding braahma
@@ -124,10 +124,13 @@ class FifteenFoldDivision(common.JsonObject):
 
     self.praatas_sandhyaa = get_interval(start_jd=jd_previous_sunset, end_jd=jd_sunrise, part_index=14, num_parts=15) + get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=range(0,4), num_parts=15)
     self.maadhyaahnika_sandhyaa = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=range(5,13), num_parts=15)
-    self.saayam_sandhyaa = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=14, num_parts=15)
+    self.saayam_sandhyaa = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=14, num_parts=15) + get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=0, num_parts=15)
 
-    # pradOSo.astamayAdUrdhvaM ghaTikAdvayamiShyatE (tithyAdi tattvam, Vrat Parichay p. 25 Gita Press).
-    self.pradosha = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=0, num_parts=15)
+    # प्रदोषोस्तमयादूर्ध्वं घटिकाद्व्यमिष्यते॥
+    # प्रदोषोस्तमयादूर्ध्वं घटिकात्रयमिष्यते॥
+    # पुरुषार्थचिन्तामणौ अस्तमयादूर्ध्वं यामार्धकालः प्रदोषः इति सिद्धान्तितम्।
+    # घटिकाद्व्यत्रयादिवचनानां यामार्धान्तर्गतप्रथमघटिकाद्वयादिप्राशस्त्यपरत्वं च प्रतिपादितम्॥
+    self.pradosha = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=0, num_parts=8)
     self.madhyaraatri = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=2, num_parts=5)
     self.nishiitha = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=7, num_parts=15)
 
@@ -188,6 +191,17 @@ class FifteenFoldDivision(common.JsonObject):
     self.saura = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=12, num_parts=15)
     self.succeeding_braahma = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=13, num_parts=15)
     self.naabhasvata = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=14, num_parts=15)
+
+    DURMUHURTA1 = (13, 8, 3, 7, 5, 3, 1)
+    DURMUHURTA2 = (None, 11, 21, None, 11, 8, 2)
+    self.durmuhurta1 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset,
+                             part_index=DURMUHURTA1[weekday], num_parts=15)
+    if DURMUHURTA2[weekday] is None:
+      self.durmuhurta2 = None
+    elif DURMUHURTA2[weekday] > 15:
+      self.durmuhurta2 = get_interval(start_jd=jd_sunset, end_jd=jd_sunrise, part_index=DURMUHURTA2[weekday] - 15, num_parts=15)
+    else:
+      self.durmuhurta2 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=DURMUHURTA2[weekday], num_parts=15)
 
     self.tb_muhuurtas = None
     self.compute_tb_muhuurtas(jd_sunrise=jd_sunrise, jd_sunset=jd_sunset)
@@ -290,7 +304,7 @@ class DayLengthBasedPeriods(common.JsonObject):
     self.aparaahna = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=1, num_parts=2)
     self.raatrimaana = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=0, num_parts=1)
     self.eight_fold_division = EightFoldDivision(jd_sunrise=jd_sunrise, jd_sunset=jd_sunset, jd_next_sunrise=jd_next_sunrise, weekday=weekday)
-    self.fifteen_fold_division = FifteenFoldDivision(jd_previous_sunset=jd_previous_sunset, jd_sunrise=jd_sunrise, jd_sunset=jd_sunset, jd_next_sunrise=jd_next_sunrise)
+    self.fifteen_fold_division = FifteenFoldDivision(jd_previous_sunset=jd_previous_sunset, jd_sunrise=jd_sunrise, jd_sunset=jd_sunset, jd_next_sunrise=jd_next_sunrise, weekday=weekday)
 
     for attr_name, obj in self.__dict__.items():
       if isinstance(obj, Interval):

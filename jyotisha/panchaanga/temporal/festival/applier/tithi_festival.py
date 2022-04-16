@@ -1,5 +1,6 @@
 import logging
 import sys
+import re
 from datetime import datetime
 from math import floor
 
@@ -16,11 +17,16 @@ from pytz import timezone as tz
 from scipy.optimize import brentq
 
 from sanskrit_data.schema import common
-
+from indic_transliteration import sanscript
 
 class TithiFestivalAssigner(FestivalAssigner):
   def assign_all(self):
-    self.assign_chandra_darshanam()
+    self.assign_solar_sidereal_amaavaasyaa()
+    self.assign_amaavaasya_vyatiipaata()
+    # Force computation of chandra darshanam for bodhayana amavasya's sake
+    self.assign_chandra_darshanam(force_computation=True)
+    self.assign_bodhaayana_amaavaasyaa()
+    self.assign_amaavaasyaa_soma()
     self.assign_chaturthi_vratam()
     self.assign_shasthi_vratam()
     self.assign_vishesha_saptami()
@@ -28,12 +34,12 @@ class TithiFestivalAssigner(FestivalAssigner):
     self.assign_mahaadvaadashii()
     self.assign_pradosha_vratam()
     self.assign_vaarunii_trayodashi()
-    self.assign_solar_sidereal_amaavaasyaa()
-    self.assign_amaavaasya_soma()
-    self.assign_amaavaasya_vyatiipaata()
+    self.assign_yama_chaturthi()
+    self.assign_vajapeyaphala_snana_yoga()
+    self.assign_mahaa_paurnamii()
   
   def assign_chaturthi_vratam(self):
-    if "vikaTa-mahAgaNapati saGkaTahara-caturthI-vratam" not in self.rules_collection.name_to_rule:
+    if "vikaTa-mahAgaNapati_saGkaTahara-caturthI-vratam" not in self.rules_collection.name_to_rule:
       return
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       # SANKATAHARA chaturthi
@@ -52,7 +58,7 @@ class TithiFestivalAssigner(FestivalAssigner):
         _m = day_panchaanga.lunar_month_sunrise.index
         if floor(_m) != _m:
           _m = 13  # Adhika masa
-        chaturthi_name = names.NAMES['SANKATAHARA_CHATURTHI_NAMES']['sa']['hk'][_m] + '-mahAgaNapati '
+        chaturthi_name = names.NAMES['SANKATAHARA_CHATURTHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][_m] + '-mahAgaNapati_'
 
         if tithi_moonrise == 19:
           # otherwise yesterday would have already been assigned
@@ -60,7 +66,8 @@ class TithiFestivalAssigner(FestivalAssigner):
             chaturthi_name = '%s%s' % ('aGgArakI~' if day_panchaanga.date.get_weekday() == 2 else '', chaturthi_name)
             fest = FestivalInstance(
               name=chaturthi_name + 'saGkaTahara-caturthI-vratam', interval=day_panchaanga.get_interval(interval_id="full_day"))
-            self.panchaanga.add_festival_instance(festival_instance=fest, date=day_panchaanga.date)
+            if day_panchaanga.lunar_month_sunrise.index != 5:
+              self.panchaanga.add_festival_instance(festival_instance=fest, date=day_panchaanga.date)
             # shravana krishna chaturthi
             if day_panchaanga.lunar_month_sunrise.index == 5:
               chaturthi_name = '%s%s' % ('aGgArakI~' if day_panchaanga.date.get_weekday() == 2 else '', chaturthi_name)
@@ -71,7 +78,8 @@ class TithiFestivalAssigner(FestivalAssigner):
           chaturthi_name = '%s%s' % ('aGgArakI~' if self.daily_panchaangas[d + 1].date.get_weekday() == 2 else '', chaturthi_name)
           fest = FestivalInstance(
             name=chaturthi_name + 'saGkaTahara-caturthI-vratam', interval=day_panchaanga.get_interval(interval_id="full_day"))
-          self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
+          if day_panchaanga.lunar_month_sunrise.index != 5:
+            self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
           # self.date_str_to_panchaanga[d].lunar_month_sunrise and[d + 1] are same, so checking [d] is enough
           if day_panchaanga.lunar_month_sunrise.index == 5:
             chaturthi_name = '%s%s' % ('aGgArakI~' if day_panchaanga.date.get_weekday() == 2 else '', chaturthi_name)
@@ -85,7 +93,8 @@ class TithiFestivalAssigner(FestivalAssigner):
               chaturthi_name = '%s%s' % ('aGgArakI~' if self.daily_panchaangas[d + 1].date.get_weekday() == 2 else '', chaturthi_name)
               fest = FestivalInstance(
                 name=chaturthi_name + 'saGkaTahara-caturthI-vratam', interval=day_panchaanga.get_interval(interval_id="full_day"))
-              self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
+              if day_panchaanga.lunar_month_sunrise.index != 5:
+                self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
               # shravana krishna chaturthi
               if day_panchaanga.lunar_month_sunrise.index == 5:
                 chaturthi_name = '%s%s' % (
@@ -172,6 +181,16 @@ class TithiFestivalAssigner(FestivalAssigner):
           if day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 7:
             self.panchaanga.add_festival(fest_id='mahAjayA~saptamI', date=day_panchaanga.date)
 
+  def assign_vishesha_ashtami(self):
+    if 'jayantI~aSTamI' in self.rules_collection.name_to_rule:
+      for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
+        day_panchaanga = self.daily_panchaangas[d]
+        # SPECIAL ASHTAMIs
+        if day_panchaanga.lunar_month_sunrise.index == 10 and NakshatraDivision(day_panchaanga.jd_sunrise, ayanaamsha_id=self.ayanaamsha_id).get_anga(
+            zodiac.AngaType.NAKSHATRA).index == 2 and \
+            day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 8:
+          self.panchaanga.add_festival(fest_id='jayantI~aSTamI', date=day_panchaanga.date)
+
   def assign_ekaadashii_vratam(self):
     if "ajA-EkAdazI" not in self.rules_collection.name_to_rule:
       return 
@@ -240,13 +259,13 @@ class TithiFestivalAssigner(FestivalAssigner):
           self.panchaanga.add_festival(fest_id='smArta-' + names.get_ekaadashii_name(ekaadashii_paksha,
                                                                                      day_panchaanga.lunar_month_sunrise.index) + ' (gRhastha)', date=self.daily_panchaangas[smaarta_ekaadashii_fday].date)
           self.panchaanga.add_festival(fest_id='smArta-' + names.get_ekaadashii_name(ekaadashii_paksha, self.daily_panchaangas[
-            d].lunar_month_sunrise.index) + ' (sannyastha)', date=self.daily_panchaangas[yati_ekaadashii_fday].date)
+            d].lunar_month_sunrise.index) + ' (sannyasta)', date=self.daily_panchaangas[yati_ekaadashii_fday].date)
           self.panchaanga.add_festival(
             fest_id='vaiSNava-' + names.get_ekaadashii_name(ekaadashii_paksha, day_panchaanga.lunar_month_sunrise.index), date=self.daily_panchaangas[vaishnava_ekaadashii_fday].date)
           if day_panchaanga.solar_sidereal_date_sunset.month == 9:
             if ekaadashii_paksha == 'shukla':
               self.panchaanga.add_festival(fest_id='smArta-vaikuNTha-EkAdazI (gRhastha)', date=self.daily_panchaangas[smaarta_ekaadashii_fday].date)
-              self.panchaanga.add_festival(fest_id='smArta-vaikuNTha-EkAdazI (sannyastha)', date=self.daily_panchaangas[yati_ekaadashii_fday].date)
+              self.panchaanga.add_festival(fest_id='smArta-vaikuNTha-EkAdazI (sannyasta)', date=self.daily_panchaangas[yati_ekaadashii_fday].date)
               self.panchaanga.add_festival(fest_id='vaiSNava-vaikuNTha-EkAdazI', date=self.daily_panchaangas[vaishnava_ekaadashii_fday].date)
 
         if yati_ekaadashii_fday == smaarta_ekaadashii_fday == vaishnava_ekaadashii_fday is None:
@@ -281,7 +300,8 @@ class TithiFestivalAssigner(FestivalAssigner):
           _date.set_time_to_day_start()
           fday_hv = time.utc_gregorian_to_jd(_date) - time.utc_gregorian_to_jd(self.daily_panchaangas[0].date)
           fest = FestivalInstance(name='harivAsaraH', interval=Interval(jd_start=None, jd_end=harivasara_end))
-          self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[int(fday_hv)].date)
+          if harivasara_end > self.daily_panchaangas[smaarta_ekaadashii_fday + 1].jd_sunrise:
+            self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[int(fday_hv)].date)
 
   def assign_mahaadvaadashii(self):
     if 'pakSavardhinI~mahAdvAdazI' not in self.rules_collection.name_to_rule:
@@ -358,8 +378,15 @@ class TithiFestivalAssigner(FestivalAssigner):
       tithi_sunset = day_panchaanga.sunrise_day_angas.get_anga_at_jd(jd=day_panchaanga.jd_sunset, anga_type=AngaType.TITHI) % 15
       tithi_sunset_tmrw = self.daily_panchaangas[d+1].sunrise_day_angas.get_anga_at_jd(jd=self.daily_panchaangas[d+1].jd_sunset, anga_type=AngaType.TITHI) % 15
       fday = None
-      if tithi_sunset in [12, 13] and tithi_sunset_tmrw != 13:
-        fday = d
+      if tithi_sunset_tmrw == 13:
+        # Let's worry about assigning this tomorrow!
+        continue
+      if tithi_sunset in [12, 13] and tithi_sunset_tmrw in [14, 0]:
+        jd_pradosha_end_today = day_panchaanga.day_length_based_periods.fifteen_fold_division.pradosha.jd_end
+        if day_panchaanga.sunrise_day_angas.get_anga_at_jd(jd=jd_pradosha_end_today, anga_type=AngaType.TITHI) % 15 == 12:
+          fday = d + 1
+        else:
+          fday = d
       elif tithi_sunset in [12, 13] and tithi_sunset_tmrw == 13:
         fday = d + 1
       if fday is not None:
@@ -382,15 +409,15 @@ class TithiFestivalAssigner(FestivalAssigner):
       # Get Name
       if day_panchaanga.lunar_month_sunrise.index == 6:
         pref = '(%s) mahAlaya ' % (
-          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index, 'hk', visarga=False))
+          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index, sanscript.roman.HK_DRAVIDIAN, visarga=False))
       elif day_panchaanga.solar_sidereal_date_sunset.month == 4:
         pref = '%s (karkaTa) ' % (
-          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index, 'hk', visarga=False))
+          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index, sanscript.roman.HK_DRAVIDIAN, visarga=False))
       elif day_panchaanga.solar_sidereal_date_sunset.month == 10:
         pref = 'mauni (%s/makara) ' % (
-          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index,  'hk', visarga=False))
+          names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index,  sanscript.roman.HK_DRAVIDIAN, visarga=False))
       else:
-        pref = names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index,  'hk',
+        pref = names.get_chandra_masa(day_panchaanga.lunar_month_sunrise.index,  sanscript.roman.HK_DRAVIDIAN,
                                       visarga=False) + '-'
 
       apraahna_interval = day_panchaanga.get_interval("अपराह्णः")
@@ -402,9 +429,9 @@ class TithiFestivalAssigner(FestivalAssigner):
       elif 24 in ama_nakshatra_today and day_panchaanga.lunar_month_sunrise.index == 10:
         suff = ' (alabhyam–zatabhiSak)'
       elif ama_nakshatra_today[0] in [15, 16, 17, 6, 7, 8, 23, 24, 25]:
-        suff = ' (alabhyam–%s)' % names.NAMES['NAKSHATRA_NAMES']['sa']['hk'][ama_nakshatra_today[0]]
+        suff = ' (alabhyam–%s)' % names.NAMES['NAKSHATRA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][ama_nakshatra_today[0]]
       elif ama_nakshatra_today[1] in [15, 16, 17, 6, 7, 8, 23, 24, 25]:
-        suff = ' (alabhyam–%s)' % names.NAMES['NAKSHATRA_NAMES']['sa']['hk'][ama_nakshatra_today[1]]
+        suff = ' (alabhyam–%s)' % names.NAMES['NAKSHATRA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][ama_nakshatra_today[1]]
       if day_panchaanga.date.get_weekday() in [1, 2, 4]:
         if suff == '':
           suff = ' (alabhyam–puSkalA)'
@@ -414,8 +441,8 @@ class TithiFestivalAssigner(FestivalAssigner):
 
     self.panchaanga.delete_festival(fest_id='sidereal_solar_month_amAvAsyA')
 
-  def assign_amaavaasya_soma(self):
-    if 'sOmavatI amAvAsyA' not in self.rules_collection.name_to_rule:
+  def assign_amaavaasyaa_soma(self):
+    if 'sOmavatI_amAvAsyA' not in self.rules_collection.name_to_rule:
       return
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       day_panchaanga = self.daily_panchaangas[d]
@@ -424,7 +451,7 @@ class TithiFestivalAssigner(FestivalAssigner):
         self.panchaanga.add_festival(fest_id='sOmavatI amAvAsyA', date=day_panchaanga.date)
 
   def assign_amaavaasya_vyatiipaata(self):
-    if 'vyatIpAta-yOgaH (alabhyam)' not in self.rules_collection.name_to_rule:
+    if 'vyatIpAta-yOgaH_(alabhyam)' not in self.rules_collection.name_to_rule:
       return
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       day_panchaanga = self.daily_panchaangas[d]
@@ -440,17 +467,64 @@ class TithiFestivalAssigner(FestivalAssigner):
       if day_panchaanga.date.get_weekday() == 0 and (day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 30 or tithi_sunset == 30):
         # AMAVASYA on a Sunday
         if (day_panchaanga.sunrise_day_angas.nakshatra_at_sunrise.index in [1, 6, 9, 22, 23] and day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 30) or \
-            (tithi_sunset == 30 and NakshatraDivision(day_panchaanga.jd_sunset,
-                                                      ayanaamsha_id=self.ayanaamsha_id).get_anga(
-              zodiac.AngaType.NAKSHATRA).index in [
-               1, 6, 9, 22, 23]):
+            (tithi_sunset == 30 and 
+             NakshatraDivision(day_panchaanga.jd_sunset,
+             ayanaamsha_id=self.ayanaamsha_id).get_anga(zodiac.AngaType.NAKSHATRA).index in [1, 6, 9, 22, 23]):
           festival_name = 'vyatIpAta-yOgaH (alabhyam)'
           self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
 
-  def assign_chandra_darshanam(self):
-    if 'candra-darzanam' not in self.rules_collection.name_to_rule:
+
+  def assign_mahaa_paurnamii(self):
+    if 'mahAcaitrI-yOgaH' not in self.rules_collection.name_to_rule:
       return
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
+      day_panchaanga = self.daily_panchaangas[d]
+
+      tithi_sunset = NakshatraDivision(day_panchaanga.jd_sunset, ayanaamsha_id=self.ayanaamsha_id).get_anga(
+        zodiac.AngaType.TITHI).index
+
+      if day_panchaanga.date.get_weekday() == 4 and (day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 15 or tithi_sunset == 15):
+        # PURNIMA on a Thursday
+        lunar_month = int(day_panchaanga.lunar_month_sunrise.index) # to deal with adhika mAsas
+        lunar_month_nakshatra = [None, 14, 16, 18, 20, 22, 25, 1, 3, 5, 8, 10, 11]
+        fest_yoga_names = [None,  "caitrI", "vaizAkhI", "jyaiSThI", "ASADhI", "zrAvaNI", "bhAdrapadI", "AzvayujI", "kArtikI", "mArgazIrSI", "pauSI", "mAghI", "phAlgunI"]
+        if (day_panchaanga.sunrise_day_angas.nakshatra_at_sunrise.index == lunar_month_nakshatra[lunar_month] and day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 15) or \
+            (tithi_sunset == 15 and NakshatraDivision(day_panchaanga.jd_sunset, ayanaamsha_id=self.ayanaamsha_id).get_anga(zodiac.AngaType.NAKSHATRA).index == lunar_month_nakshatra[lunar_month]):
+          festival_name = 'mahA-%s-yOgaH' % fest_yoga_names[lunar_month]
+          self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
+
+  def assign_yama_chaturthi(self):
+    if 'yamacaturthI-vratam' not in self.rules_collection.name_to_rule:
+      return
+    for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
+      day_panchaanga = self.daily_panchaangas[d]
+      # चतुर्थी भरणीयोगः शनैश्चरदिने यदि ।
+      # तदाभ्यर्च्य यमं देवं मुच्यते सर्वकिल्विषैः ॥
+      tithi_sunset = NakshatraDivision(day_panchaanga.jd_sunset, ayanaamsha_id=self.ayanaamsha_id).get_anga(
+        zodiac.AngaType.TITHI).index
+      nakshatra_sunset = NakshatraDivision(day_panchaanga.jd_sunset, ayanaamsha_id=self.ayanaamsha_id).get_anga(
+        zodiac.AngaType.NAKSHATRA).index
+      if day_panchaanga.date.get_weekday() == 6 and (day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index in [4, 19] or tithi_sunset in [4, 19]):
+        if day_panchaanga.sunrise_day_angas.nakshatra_at_sunrise.index == 2 or  nakshatra_sunset == 2:
+          festival_name = 'yamacaturthI-vratam'
+          self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
+
+  def assign_vajapeyaphala_snana_yoga(self):
+    if 'vAjapEyaphala-snAna-yOgaH' not in self.rules_collection.name_to_rule:
+      return
+    for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
+      day_panchaanga = self.daily_panchaangas[d]
+      # पुनर्वसुबुधोपेता चैत्रे मासि सिताष्टमी।
+      # प्रातस्तु विधिवत्स्नात्वा वाजपेयफलं लभेत्॥
+      if day_panchaanga.lunar_month_sunrise.index == 1 and day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 8 and day_panchaanga.date.get_weekday() == 3 and day_panchaanga.sunrise_day_angas.nakshatra_at_sunrise.index == 7:
+        festival_name = 'vAjapEyaphala-snAna-yOgaH'
+        self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
+
+  def assign_chandra_darshanam(self, force_computation=False):
+    if 'candra-darzanam' not in self.rules_collection.name_to_rule and not force_computation:
+      return
+    d = self.panchaanga.duration_prior_padding
+    while d < self.panchaanga.duration + self.panchaanga.duration_prior_padding:
       day_panchaanga = self.daily_panchaangas[d]
       # Chandra Darshanam
       if day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 1 or day_panchaanga.sunrise_day_angas.tithi_at_sunrise.index == 2:
@@ -459,14 +533,40 @@ class TithiFestivalAssigner(FestivalAssigner):
         # if tithi_sunset <= 2 and tithi_sunset_tmrw != 2:
         if tithi_sunset <= 2:
           if tithi_sunset == 1:
-            fest = FestivalInstance(name='candra-darzanam', interval=self.daily_panchaangas[d+1].get_interval(interval_id="pradosha"))
+            fest = FestivalInstance(name='candra-darzanam', interval=Interval(jd_start=self.daily_panchaangas[d+1].jd_sunset, jd_end=self.daily_panchaangas[d+1].jd_moonset))
             self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
+            
+            d += 25
           else:
-            fest = FestivalInstance(name='candra-darzanam', interval=day_panchaanga.get_interval(interval_id="pradosha"))
-            self.panchaanga.add_festival_instance(festival_instance=fest, date=day_panchaanga.date)
+            fest = FestivalInstance(name='candra-darzanam', interval=Interval(jd_start=self.daily_panchaangas[d].jd_sunset, jd_end=self.daily_panchaangas[d].jd_moonset))
+            self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d].date)
+            d += 25
         elif tithi_sunset_tmrw == 2:
-          fest = FestivalInstance(name='candra-darzanam', interval=self.daily_panchaangas[d+1].get_interval(interval_id="pradosha"))
+          fest = FestivalInstance(name='candra-darzanam', interval=Interval(jd_start=self.daily_panchaangas[d+1].jd_sunset, jd_end=self.daily_panchaangas[d+1].jd_moonset))
           self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[d+1].date)
+          d += 25
+      d += 1
+
+  def assign_bodhaayana_amaavaasyaa(self):
+    chandra_darshanam_days = list(self.panchaanga.festival_id_to_days['candra-darzanam'])
+    for cdd in chandra_darshanam_days:
+      if 'darsheShTiH' in self.panchaanga.daily_panchaanga_for_date(cdd).festival_id_to_instance.keys():
+        self.panchaanga.add_festival(fest_id='bOdhAyana-iSTiH', date=self.panchaanga.daily_panchaanga_for_date(cdd - 1).date)
+
+      ama_fest = [val for key, val in self.panchaanga.daily_panchaanga_for_date(cdd - 1).festival_id_to_instance.items() if 'amAvAsyA' in key]
+      if ama_fest:
+        # We have amAvAsyA preceding chandra darshanam. Therefore, the previous day must be assigned as bOdhAayana
+        bodhaayana_fest = re.sub('amAvAsyA.*', 'amAvAsyA', 'bOdhAyana ' + ama_fest[0].name)
+        self.panchaanga.add_festival(fest_id=bodhaayana_fest, date=self.panchaanga.daily_panchaanga_for_date(cdd - 2).date)
+        self.panchaanga.add_festival(fest_id='bOdhAyana-iSTiH', date=self.panchaanga.daily_panchaanga_for_date(cdd - 1).date)
+      else:
+        for key, val in dict(self.panchaanga.daily_panchaanga_for_date(cdd - 2).festival_id_to_instance).items():
+          if 'amAvAsyA' in key:
+            fest_id = key
+            self.panchaanga.delete_festival_date(fest_id=fest_id, date=self.panchaanga.daily_panchaanga_for_date(cdd - 2).date)
+            self.panchaanga.add_festival(fest_id='sarva-' + fest_id, date=self.panchaanga.daily_panchaanga_for_date(cdd - 2).date)
+    if 'candra-darzanam' not in self.rules_collection.name_to_rule:
+      self.panchaanga.delete_festival(fest_id='candra-darzanam')
 
   def assign_vaarunii_trayodashi(self):
     if 'vAruNI~trayOdazI' not in self.rules_collection.name_to_rule:
@@ -481,7 +581,7 @@ class TithiFestivalAssigner(FestivalAssigner):
           if day_panchaanga.date.get_weekday() == 6:
             vtr_name = 'mahA' + vtr_name
             if NakshatraDivision(day_panchaanga.jd_sunrise, ayanaamsha_id=self.ayanaamsha_id).get_anga(
-                zodiac.AngaType.NAKSHATRA).index == 23:
+                zodiac.AngaType.YOGA).index == 23:
               vtr_name = 'mahA' + vtr_name
           self.panchaanga.add_festival(fest_id=vtr_name, date=day_panchaanga.date)
 

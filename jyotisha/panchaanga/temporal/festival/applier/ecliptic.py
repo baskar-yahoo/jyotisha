@@ -10,15 +10,17 @@ from jyotisha.panchaanga.temporal.interval import Interval
 from jyotisha.panchaanga.temporal.zodiac import AngaType
 from scipy.optimize import brentq
 from sanskrit_data.schema import common
-
+from indic_transliteration import sanscript
 
 class EclipticFestivalAssigner(FestivalAssigner):
   def assign_all(self):
     self.set_jupiter_transits()
     self.compute_solar_eclipses()
     self.compute_lunar_eclipses()
-    # self.compute_conjunctions(Graha.SATURN, Graha.JUPITER)
-    # self.compute_conjunctions(Graha.VENUS, Graha.SUN, 10)
+    # for graha1 in [Graha.MOON, Graha.JUPITER, Graha.VENUS, Graha.MERCURY, Graha.MARS, Graha.SATURN, Graha.RAHU]:
+    #   for graha2 in [Graha.MOON, Graha.JUPITER, Graha.VENUS, Graha.MERCURY, Graha.MARS, Graha.SATURN, Graha.RAHU]:
+    #     if graha1 > graha2:
+    #       self.compute_conjunctions(graha1, graha2)
 
   def compute_conjunctions(self, Graha1, Graha2, delta=0.0):
     # Compute the time of conjunction between Graha1 and Graha2
@@ -78,20 +80,27 @@ class EclipticFestivalAssigner(FestivalAssigner):
       if jd_eclipse_solar_start > self.panchaanga.jd_end + 1:
         break
       else:
-        fday = int(floor(jd) - floor(self.daily_panchaangas[0].julian_day_start))
-        if (jd < self.daily_panchaangas[fday].jd_sunrise):
-          fday -= 1
-        if (jd_eclipse_solar_start) == 0.0 or jd_eclipse_solar_end == 0.0:
+        fday = int(jd_eclipse_solar_end - self.daily_panchaangas[0].julian_day_start)
+        suff = 'a'
+        if (jd_eclipse_solar_start < self.daily_panchaangas[fday].jd_sunrise):
+          # Grastodaya
+          suff = 'Odaya'
+          jd_eclipse_solar_start = self.daily_panchaangas[fday].jd_sunrise
+        if jd_eclipse_solar_end > self.daily_panchaangas[fday].jd_sunset:
+          # Grastastamana
+          suff = 'Astamana'
+          jd_eclipse_solar_end = self.daily_panchaangas[fday].jd_sunset
+        if jd_eclipse_solar_start == 0.0 or jd_eclipse_solar_end == 0.0:
           # Move towards the next eclipse... at least the next new
           # moon (>=25 days away)
           jd += MIN_DAYS_NEXT_ECLIPSE
           continue
         if abs (Graha.singleton(Graha.SUN).get_longitude(jd_eclipse_solar_end) - Graha.singleton(Graha.RAHU).get_longitude(
             jd_eclipse_solar_end)) < 5:
-          grasta = 'rAhugrasta'
+          grasta = 'rAhugrast'
         else:
-          grasta = 'kEtugrasta'
-        solar_eclipse_str = 'sUrya-grahaNaM~(' + grasta + ')'
+          grasta = 'kEtugrast'
+        solar_eclipse_str = 'sUrya-grahaNaM~(' + grasta + suff + ')'
         if self.daily_panchaangas[fday].date.get_weekday() == 0:
           solar_eclipse_str = '★cUDAmaNi-' + solar_eclipse_str
         fest = FestivalInstance(name=solar_eclipse_str, interval=Interval(jd_start=jd_eclipse_solar_start, jd_end=jd_eclipse_solar_end))
@@ -103,71 +112,79 @@ class EclipticFestivalAssigner(FestivalAssigner):
       return
       # Set location
     jd = self.panchaanga.jd_start
+    
     while 1:
       next_eclipse_lun = self.panchaanga.city.get_lunar_eclipse_time(jd)
       jd = next_eclipse_lun[1][0]
       jd_eclipse_lunar_start = next_eclipse_lun[1][2]
       jd_eclipse_lunar_end = next_eclipse_lun[1][3]
-      # -1 is to not miss an eclipse that occurs after sunset on 31-Dec!
-      if jd_eclipse_lunar_start > self.panchaanga.jd_end:
+
+      if jd > self.panchaanga.jd_end:
         break
+
+      if jd_eclipse_lunar_start == 0.0 and jd_eclipse_lunar_end == 0.0:
+        # 0.0 is returned in case of eclipses when the moon is below the horizon.
+        # Move towards the next eclipse... at least the next full
+        # moon (>=25 days away)
+        jd += MIN_DAYS_NEXT_ECLIPSE
+        continue
+
+      suff = 'a'
+      if jd_eclipse_lunar_start != 0.0 and jd_eclipse_lunar_end != 0.0:
+        # Regular eclipse
+        # fday = int(floor(jd_eclipse_lunar_start) - floor(self.panchaanga.jd_start) + 1)
+        fday = int(jd_eclipse_lunar_start - self.daily_panchaangas[0].julian_day_start)
+      elif jd_eclipse_lunar_start == 0.0:
+        # Grastodaya
+        suff = 'Odaya'
+        jd_eclipse_lunar_start = self.panchaanga.city.get_rising_time(julian_day_start=jd_eclipse_lunar_end - 0.5, body=Graha.MOON)
+      elif jd_eclipse_lunar_end == 0.0:
+        # Grastastamana
+        suff = 'Astamana'
+        jd_eclipse_lunar_end = self.panchaanga.city.get_setting_time(julian_day_start=jd_eclipse_lunar_start, body=Graha.MOON)
+
+      # fday = int(floor(jd_eclipse_lunar_start) - floor(self.panchaanga.jd_start) + 1)
+      fday = int(jd_eclipse_lunar_start - self.daily_panchaangas[0].julian_day_start)
+      if jd_eclipse_lunar_start < self.daily_panchaangas[fday].jd_sunrise:
+        fday -= 1
+      
+      # print '%%', jd, fday, self.date_str_to_panchaanga[fday].jd_sunrise,
+      # self.date_str_to_panchaanga[fday-1].jd_sunrise, eclipse_lunar_start,
+      # eclipse_lunar_end
+      
+      if Graha.singleton(Graha.MOON).get_longitude(jd_eclipse_lunar_end) < Graha.singleton(Graha.SUN).get_longitude(
+          jd_eclipse_lunar_end):
+        grasta = 'rAhugrast'
       else:
-        if jd_eclipse_lunar_start == 0.0 or jd_eclipse_lunar_end == 0.0:
-          # 0.0 is returned in case of eclipses when the moon is below the horizon.
-          # Move towards the next eclipse... at least the next full
-          # moon (>=25 days away)
-          jd += MIN_DAYS_NEXT_ECLIPSE
-          continue
-        fday = int(floor(jd_eclipse_lunar_start) - floor(self.panchaanga.jd_start) + 1)
-        # print '%%', jd, fday, self.date_str_to_panchaanga[fday].jd_sunrise,
-        # self.date_str_to_panchaanga[fday-1].jd_sunrise
-        if jd < self.daily_panchaangas[fday].jd_sunrise:
-          fday -= 1
-        # print '%%', jd, fday, self.date_str_to_panchaanga[fday].jd_sunrise,
-        # self.date_str_to_panchaanga[fday-1].jd_sunrise, eclipse_lunar_start,
-        # eclipse_lunar_end
-        jd_moonrise_eclipse_day = self.panchaanga.city.get_rising_time(julian_day_start=self.daily_panchaangas[fday].jd_sunrise, body=Graha.MOON)
+        grasta = 'kEtugrast'
 
-        jd_moonset_eclipse_day = self.panchaanga.city.get_setting_time(julian_day_start=jd_moonrise_eclipse_day, body=Graha.MOON)
+      grasta += suff
 
-        if jd_eclipse_lunar_end < jd_moonrise_eclipse_day or \
-            jd_eclipse_lunar_start > jd_moonset_eclipse_day:
-          # Move towards the next eclipse... at least the next full
-          # moon (>=25 days away)
-          jd += MIN_DAYS_NEXT_ECLIPSE
-          continue
+      lunar_eclipse_str = 'candra-grahaNam~(' + grasta + ')'
+      if self.daily_panchaangas[fday].date.get_weekday() == 1:
+        lunar_eclipse_str = '★cUDAmaNi-' + lunar_eclipse_str
 
-        if Graha.singleton(Graha.MOON).get_longitude(jd_eclipse_lunar_end) < Graha.singleton(Graha.SUN).get_longitude(
-            jd_eclipse_lunar_end):
-          grasta = 'rAhugrasta'
-        else:
-          grasta = 'kEtugrasta'
-
-        lunar_eclipse_str = 'candra-grahaNam~(' + grasta + ')'
-        if self.daily_panchaangas[fday].date.get_weekday() == 1:
-          lunar_eclipse_str = '★cUDAmaNi-' + lunar_eclipse_str
-
-        fest = FestivalInstance(name=lunar_eclipse_str, interval=Interval(jd_start=jd_eclipse_lunar_start, jd_end=jd_eclipse_lunar_end))
-        self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[fday].date)
+      fest = FestivalInstance(name=lunar_eclipse_str, interval=Interval(jd_start=jd_eclipse_lunar_start, jd_end=jd_eclipse_lunar_end))
+      self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[fday].date)
       jd += MIN_DAYS_NEXT_ECLIPSE
 
   def set_jupiter_transits(self):
     if 'guru-saGkrAntiH' not in self.rules_collection.name_to_rule:
       return 
-    jd_end = self.panchaanga.jd_start + self.panchaanga.duration
+    jd_end = self.panchaanga.jd_start + self.panchaanga.duration + 13
     check_window = 400  # Max t between two Jupiter transits is ~396 (checked across 180y)
     # Let's check for transitions in a relatively large window
     # to finalise what is the FINAL transition post retrograde movements
-    transits = Graha.singleton(Graha.JUPITER).get_transits(self.panchaanga.jd_start, jd_end + check_window, anga_type=AngaType.RASHI,
+    transits = Graha.singleton(Graha.JUPITER).get_transits(self.panchaanga.jd_start - 13, jd_end + check_window, anga_type=AngaType.RASHI,
                                                            ayanaamsha_id=self.ayanaamsha_id)
     if len(transits) > 0:
       for i, transit in enumerate(transits):
         (jd_transit, rashi1, rashi2) = (transit.jd, transit.value_1, transit.value_2)
-        if self.panchaanga.jd_start < jd_transit < jd_end:
+        if self.panchaanga.jd_start - 13 < jd_transit < jd_end:
           fday = int(floor(jd_transit) - floor(self.daily_panchaangas[0].julian_day_start))
-          fest = TransitionFestivalInstance(name='guru-saGkrAntiH', status_1_hk=names.NAMES['RASHI_NAMES']['sa']['hk'][rashi1], status_2_hk=names.NAMES['RASHI_NAMES']['sa']['hk'][rashi2])
+          fest = TransitionFestivalInstance(name='guru-saGkrAntiH', status_1_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], status_2_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2])
           self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[fday].date)
-          if rashi1 < rashi2 and transits[i + 1].value_1 < transits[i + 1].value_2:
+          if (rashi1 % 12 + 1) == rashi2 and ((transits[i + 1].value_1 % 12) + 1) == transits[i + 1].value_2:
             # Considering only non-retrograde transits for pushkara computations
             # logging.debug('Non-retrograde transit; we have a pushkaram!')
             (madhyanha_start, madhyaahna_end) = interval.get_interval(self.daily_panchaangas[fday].jd_sunrise,
@@ -177,13 +194,13 @@ class EclipticFestivalAssigner(FestivalAssigner):
             else:
               fday_pushkara = fday + 1
             self.panchaanga.add_festival(
-              fest_id='%s-Adi-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa']['hk'][rashi2], date=self.daily_panchaangas[fday_pushkara].date)
+              fest_id='%s-Adi-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date)
             self.panchaanga.add_festival(
-              fest_id='%s-Adi-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa']['hk'][rashi2], date=self.daily_panchaangas[fday_pushkara].date + 11)
+              fest_id='%s-Adi-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date + 11)
             self.panchaanga.add_festival(
-              fest_id='%s-antya-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa']['hk'][rashi1], date=self.daily_panchaangas[fday_pushkara].date - 1)
+              fest_id='%s-antya-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], date=self.daily_panchaangas[fday_pushkara].date - 1)
             self.panchaanga.add_festival(
-              fest_id='%s-antya-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa']['hk'][rashi1], date=self.daily_panchaangas[fday_pushkara].date - 12)
+              fest_id='%s-antya-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], date=self.daily_panchaangas[fday_pushkara].date - 12)
 
 
 MIN_DAYS_NEXT_ECLIPSE = 25

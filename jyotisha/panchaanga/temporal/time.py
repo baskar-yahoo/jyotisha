@@ -47,10 +47,14 @@ class Hour(JsonObject):
     if format[-1] == '*':
       if hour >= 24:
         suffix = '*'
-    else:
+    elif format[-1] == '+':
       if hour >= 24:
         hour -= 24
         suffix = '(+1)'  # Default notation for times > 23:59
+    else:
+      if hour >= 24:
+        hour -= 24
+        suffix = '*'  # Default notation for times > 23:59
 
     minute = secs // 60
     secs = secs % 60
@@ -72,17 +76,17 @@ class Hour(JsonObject):
       return ('%d-%d' % (gg, pp))
     elif format == 'gg-pp-vv':  # ghatika-pal-vipal
       vv_tot = round(self.hour * 3600 / 0.4)
-      logging.debug(vv_tot)
+      # logging.debug(vv_tot)
       vv = vv_tot % 60
-      logging.debug(vv)
+      # logging.debug(vv)
       vv_tot = (vv_tot - vv) // 60
-      logging.debug(vv_tot)
+      # logging.debug(vv_tot)
       pp = vv_tot % 60
-      logging.debug(pp)
+      # logging.debug(pp)
       vv_tot = (vv_tot - pp) // 60
-      logging.debug(vv_tot)
+      # logging.debug(vv_tot)
       gg = vv_tot
-      logging.debug(gg)
+      # logging.debug(gg)
       return ('%d-%d-%d' % (gg, pp, vv))
     else:
       raise Exception("""Unknown format""")
@@ -200,6 +204,12 @@ class Date(BasicDate):
     from convertdate import julian
     greg_date_tuple = julian.to_gregorian(year=year, month=month, day=day)
     return Date(year=greg_date_tuple[0], month=greg_date_tuple[1], day=greg_date_tuple[2])
+
+  @classmethod
+  def to_julian_date(cls, year, month, day):
+    from convertdate import julian
+    date_tuple = julian.from_gregorian(year=year, month=month, day=day)
+    return Date(year=date_tuple[0], month=date_tuple[1], day=date_tuple[2])
 
   def to_indian_civil_date(self):
     from convertdate import indian_civil

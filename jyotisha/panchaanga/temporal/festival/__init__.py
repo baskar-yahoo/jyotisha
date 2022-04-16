@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 
-from indic_transliteration import sanscript, language_code_to_script, xsanscript
+from indic_transliteration import sanscript, language_code_to_script
 from jyotisha import custom_transliteration
 from jyotisha.util import default_if_none
 from sanskrit_data.schema import common
@@ -29,16 +29,18 @@ class FestivalInstance(common.JsonObject):
     if self.ordinal is not None:
       name = name + " #%s" % int(self.ordinal)
 
-    if self.interval is None:
+    if self.interval is None or self._show_interval() is False:
       return name
     else:
-      return "%s (%s)" % (name, self.interval.to_hour_text(script=sanscript.IAST, tz=timezone, reference_date=reference_date))
+      return "%s (%s)" % (name, self.interval.to_hour_text(script=sanscript.ISO, tz=timezone, reference_date=reference_date))
 
   def get_human_names(self, fest_details_dict):
     from jyotisha.panchaanga.temporal.festival import rules
     fest_details = fest_details_dict.get(self.name, rules.HinduCalendarEvent(id=self.name))
     if fest_details.names is None:
-      fest_details.names = {"sa": [xsanscript.transliterate(self.name.replace("~", " "), sanscript.HK, sanscript.DEVANAGARI)]}
+      sa_name = sanscript.transliterate(self.name.replace("~", " "), sanscript.roman.HK_DRAVIDIAN, sanscript.DEVANAGARI, togglers={'##'})
+      sa_name = rules.inverse_clean_id(sa_name)
+      fest_details.names = {"sa": [sa_name]}
     import copy
     names = copy.deepcopy(fest_details.names)
     return names
@@ -62,7 +64,7 @@ class FestivalInstance(common.JsonObject):
     transliterated_text = custom_transliteration.transliterate_from_language(language=language, text=names[language][0], script=scripts[0])
     return {"script": scripts[0], "text": transliterated_text}
 
-  def tex_code(self, languages, scripts, timezone, fest_details_dict, reference_date=None):
+  def tex_code(self, languages, scripts, timezone, fest_details_dict, reference_date=None, time_format='hh:mm'):
     name_details = self.get_best_transliterated_name(languages=languages, scripts=scripts, fest_details_dict=fest_details_dict)
     if name_details["script"] == sanscript.TAMIL:
       name = '\\tamil{%s}' % name_details["text"]
@@ -73,11 +75,11 @@ class FestivalInstance(common.JsonObject):
       name = name + "~\\#{%s}" % custom_transliteration.tr(str(self.ordinal), script=scripts[0])
 
     if self.interval is not None and self._show_interval():
-      return "%s%s" % (name, self.interval.to_hour_tex(script=scripts[0], tz=timezone, reference_date=reference_date))
+      return "%s%s" % (name, self.interval.to_hour_tex(script=scripts[0], tz=timezone, reference_date=reference_date, time_format=time_format))
     else:
       return name
 
-  def get_full_title(self, fest_details_dict, languages=["sa"], scripts=[xsanscript.DEVANAGARI]):
+  def get_full_title(self, fest_details_dict, languages=["sa"], scripts=[sanscript.DEVANAGARI]):
     name_details = self.get_best_transliterated_name(languages=languages, scripts=scripts, fest_details_dict=fest_details_dict)
     ordinal_str = " #%s" % custom_transliteration.tr(str(self.ordinal), script=name_details["script"]) if self.ordinal is not None else ""
     return "%s%s" % (name_details["text"].replace("~", "-"), ordinal_str)
@@ -121,7 +123,7 @@ class TransitionFestivalInstance(FestivalInstance):
     self.status_1_hk = status_1_hk
     self.status_2_hk = status_2_hk
 
-  def tex_code(self, languages, scripts, timezone, fest_details_dict, reference_date=None):
+  def tex_code(self, languages, scripts, timezone, fest_details_dict, reference_date=None, time_format='hh:mm'):
     name_details = self.get_best_transliterated_name(languages=languages, scripts=scripts, fest_details_dict=fest_details_dict)
     name = name_details["text"]
     return custom_transliteration.tr("%s~(%s##\\To{}##%s)" % (name, self.status_1_hk, self.status_2_hk), script=scripts[0])
@@ -141,7 +143,7 @@ def get_description(festival_instance, fest_details_dict, script, truncate=True,
   elif re.match('.*-.*-EkAdazI', fest_id) is not None:
     # Handle ekaadashii descriptions differently
     ekad = '-'.join(fest_id.split('-')[1:])  # get rid of sarva etc. prefix!
-    ekad_suff_pos = ekad.find(' (')
+    ekad_suff_pos = ekad.find('_(')
     if ekad_suff_pos != -1:
       # ekad_suff = ekad[ekad_suff_pos + 1:-1]
       ekad = ekad[:ekad_suff_pos]
@@ -193,7 +195,7 @@ def get_description_tex(festival_instance, fest_details_dict, script):
   elif re.match('.*-.*-EkAdazI', fest_id) is not None:
     # Handle ekaadashii descriptions differently
     ekad = '-'.join(fest_id.split('-')[1:])  # get rid of sarva etc. prefix!
-    ekad_suff_pos = ekad.find(' (')
+    ekad_suff_pos = ekad.find('_(')
     if ekad_suff_pos != -1:
       # ekad_suff = ekad[ekad_suff_pos + 1:-1]
       ekad = ekad[:ekad_suff_pos]
@@ -230,7 +232,7 @@ def get_description_tex(festival_instance, fest_details_dict, script):
     logging.warning(fest_id)
     return '{}{}{}{}{} %%EMPTY DESCRIPTION!'
   else:
-    desc['detailed'] = desc['detailed'].replace('&', '\\&').replace('\n', '\\\\').replace('\\\\\\\\', '\\\\')
+    desc['detailed'] = desc['detailed'].replace('&', '\\&').replace('\n', '\\\\').replace('\\\\\\\\', '\\\\').replace('## ', '')
     desc['detailed'] = desc['detailed'][:1].capitalize() + desc['detailed'][1:]
     desc['shlokas'] = desc['shlokas'].replace('\n', '\\\\').replace('\\\\\\\\', '\\\\').replace('\\\\  \\\\', '\\\\\\smallskip ')
     desc['references'] = desc['references'].replace('- References\n  ', '')

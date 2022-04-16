@@ -31,15 +31,23 @@ def decide_paraviddha(p0, p1, target_anga, kaala):
       d1_angas.start == target_anga and d1_angas.end == target_anga):
     # Incident at kaala on two consecutive days; so take second
     fday = 1
+  elif d0_angas.start == target_anga and d0_angas.end == target_anga and d1_angas.start == target_anga:
+    # Incident on day 1, and touching day 2
+    if d1_angas.interval.name in ['प्रातः']:
+      fday = 0
+    else:
+      fday = 1
   elif d0_angas.start == target_anga and d0_angas.end == target_anga:
-    # Incident only on day 1, maybe just touching day 2
     fday = 0
   elif d0_angas.end == target_anga:
     fday = 0
   elif d1_angas.start == target_anga:
-    fday = 0
+    if d1_angas.interval.name in ['प्रातः']:
+      fday = 0
+    else:
+      fday = 1
   elif d0_angas.start == target_anga and d0_angas.end == next_anga:
-    if d0_angas.interval.name in ['aparaahna']:
+    if d0_angas.interval.name in ['अपराह्णः']:
       fday = 0
     else:
       # Example when this branch is active: 2019 'madhurakavi AzhvAr tirunakSattiram': sidereal_solar_month 1, nakshatra 14 paraviddha praatah.
@@ -84,10 +92,10 @@ def decide_puurvaviddha(p0, p1, target_anga, kaala):
   return FestivalDecision.from_details(boundary_angas_list=[d0_angas, d1_angas], fday=fday, panchaangas=[p0, p1])
 
 
-def decide_aparaahna_vyaapti(p0, p1, target_anga, ayanaamsha_id, kaala):
+def decide_vyaapti(p0, p1, target_anga, ayanaamsha_id, kaala):
   (d0_angas, d1_angas) = get_2_day_interval_boundary_angas(kaala=kaala, anga_type=target_anga.get_type(), p0=p0, p1=p1)
-  if kaala not in ['अपराह्णः']:
-    raise ValueError(kaala)
+  # if kaala not in ['अपराह्णः']:
+  #   raise ValueError(kaala)
 
   prev_anga = target_anga - 1
   next_anga = target_anga + 1
@@ -146,6 +154,6 @@ def decide(p0, p1, target_anga, kaala, priority, ayanaamsha_id):
   elif priority == 'puurvaviddha':
     decision = decide_puurvaviddha(p0=p0, p1=p1, target_anga=target_anga, kaala=kaala)
   elif priority == 'vyaapti':
-    decision = decide_aparaahna_vyaapti(p0=p0, p1=p1, target_anga=target_anga, kaala=kaala, ayanaamsha_id=ayanaamsha_id)
+    decision = decide_vyaapti(p0=p0, p1=p1, target_anga=target_anga, kaala=kaala, ayanaamsha_id=ayanaamsha_id)
   return decision
 
