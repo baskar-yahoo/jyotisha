@@ -22,7 +22,6 @@ from jyotisha.panchaanga.writer.table.day_details import to_table_dict
 
 output_dir = os.path.join(os.path.dirname(os.path.dirname(jyotisha.__file__)), "hugo-source", "content", "output")
 
-
 def dump_ics_md_pair(panchaanga, period_str):
   ics_calendar = ics.compute_calendar(panchaanga)
   (year_type, year) = period_str.split("/")
@@ -34,7 +33,7 @@ def dump_ics_md_pair(panchaanga, period_str):
   md_file = MdFile(file_path=output_file_ics.replace(".ics", ".md"), frontmatter_type=MdFile.YAML)
   intro = "## 00 Intro\n### Related files\n- [ics](../%s)\n" % str(os.path.basename(output_file_ics))
   md_content = "%s\n%s" % (intro, md.make_md(panchaanga=panchaanga))
-  md_file.dump_to_file(metadata={"title": year}, content=md_content, dry_run=False)
+  md_file.dump_to_file(metadata={"title": f"{year}{panchaanga.computation_system.get_short_id_str()}"}, content=md_content, dry_run=False)
 
   monthly_file_path = md_file.file_path.replace(".md", "_monthly.md")
   monthly_dir = monthly_file_path.replace(".md", "/")
@@ -55,10 +54,10 @@ def dump_detailed(year, city, year_type, computation_system=ComputationSystem.MU
   logging.info("Generating detailed panchaanga for %s year %d (%s), with computation system %s ", city.name, year, year_type, str(computation_system))
   panchaanga = annual.get_panchaanga_for_year(city=city, year=year, computation_system=computation_system, year_type=year_type, allow_precomputed=allow_precomputed)
   dump_ics_md_pair(panchaanga=panchaanga, period_str="%s/%04d" % (year_type, year))
+  dump_summary(year=year, city=city, year_type=year_type, computation_system=computation_system, allow_precomputed=True)
 
 
-def dump_summary(year, city, script=sanscript.DEVANAGARI, computation_system=ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180, allow_precomputed=False):
-  year_type = era.ERA_GREGORIAN
+def dump_summary(year, city, script=sanscript.DEVANAGARI, year_type=era.ERA_GREGORIAN, computation_system=ComputationSystem.MULTI_NEW_MOON_SIDEREAL_MONTH_ADHIKA__CHITRA_180, allow_precomputed=False):
   logging.info("Generating summary panchaanga for %s year %d (%s), with computation system %s ", city.name, year, year_type, str(computation_system))
   panchaanga = annual.get_panchaanga_for_year(city=city, year=year, computation_system=computation_system, year_type=year_type, allow_precomputed=allow_precomputed)
   year_table = to_table_dict(panchaanga=panchaanga )
@@ -74,10 +73,12 @@ def dump_summary(year, city, script=sanscript.DEVANAGARI, computation_system=Com
   <div class="spreadsheet" src="../%s.toml" fullHeightWithRowsPerScreen=4> </div>""" % (computation_params, 
     str(year))
   md_file = MdFile(file_path=out_path_md)
-  md_file.dump_to_file(metadata={"title": "%d Summary" % (year)}, content=md, dry_run=False)
+  md_file.dump_to_file(metadata={"title": f"{year} Summary {panchaanga.computation_system.get_short_id_str()}"}, content=md, dry_run=False)
 
 
 def get_canonical_path(city, computation_system_str, year, year_type=era.ERA_GREGORIAN, output_dir=output_dir):
+  if isinstance(year, str):
+    year = int(year)
   out_path = os.path.join(output_dir, city, computation_system_str, year_type,
                           '%02d00s/%03d0s/%04d' % (int(year / 100), int(year / 10), year))
   return out_path

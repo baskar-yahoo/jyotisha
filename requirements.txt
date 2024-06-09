@@ -17,9 +17,9 @@ flask_cors
 jsonpickle
 methodtools
 Werkzeug
-jyotisha
 timebudget
 Flask
 pypandoc
 setuptools
 python-telegram-bot
+discord.py

@@ -28,17 +28,14 @@ def get_ekaadashii_name(paksha, lmonth):
       return "%s-EkAdazI" % NAMES["KRISHNA_EKADASHI_NAMES"]["sa"][sanscript.roman.HK_DRAVIDIAN][13]
 
 
-def get_chandra_masa(month, script, visarga=True):
+def get_chandra_masa(month, script, name_type="CHANDRA_MASA_NAMES", visarga=True):
   if visarga:
     if month == int(month):
-      return NAMES["CHANDRA_MASA_NAMES"]["sa"][script][int(month)]
+      return NAMES[name_type]["sa"][script][int(month)]
     else:
-      return "%s-(%s)" % (NAMES["CHANDRA_MASA_NAMES"]["sa"][script][int(month) + 1], tr("adhikaH", script, titled=False))
+      return "%s-%s" % (tr("adhika", script, titled=False), NAMES[name_type]["sa"][script][int(month) + 1])
   else:
-    if month == int(month):
-      return NAMES["CHANDRA_MASA_NAMES"]["sa"][script][int(month)][:-1]
-    else:
-      return "%s-(%s)" % (NAMES["CHANDRA_MASA_NAMES"]["sa"][script][int(month) + 1][:-1], tr("adhika", script, titled=False))
+    return get_chandra_masa(month=month, script=script, visarga=True)[:-1]
 
 
 def get_month_name_en(month_number, month_type, script=sanscript.ISO):
@@ -74,8 +71,10 @@ python_to_devanaagarii = {
   "braahma": "ब्राह्मं मुहूर्तम्",
   "praatah": "प्रातः",
   "aparaahna": "अपराह्णः",
+  "aparaahna3": "अपराह्णः~(त्रेधा)",
   "saangava": "साङ्गवः",
   "madhyaahna": "मध्याह्नः",
+  "madhyaahna3": "मध्याह्नः~(त्रेधा)",
   "saayaahna": "सायाह्नः",
   "pradosha": "प्रदोषः",
   "saayam_sandhyaa": "सायंसन्ध्यावन्दनकालः",
@@ -105,6 +104,7 @@ python_to_devanaagarii = {
   "preceding_arunodaya": "प्राक्तनारुणोदयः",
   "maadhyaahnika_sandhyaa": "माध्याह्निकसन्ध्यावन्दनकालः",
   "puurvaahna": "पूर्वाह्णः",
+  "puurvaahna3": "पूर्वाह्णः~(त्रेधा)",
   "raatrimaana": "रात्रिमानम्",
   "dinamaana": "दिनमानम्",
   "sunrise": "सूर्योदयः",

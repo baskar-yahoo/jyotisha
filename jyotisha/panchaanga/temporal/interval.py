@@ -7,6 +7,8 @@ import methodtools
 
 from indic_transliteration import sanscript
 from jyotisha.panchaanga.temporal import names
+from jyotisha.panchaanga.temporal.names import translate_or_transliterate
+from jyotisha.panchaanga.temporal.time import Hour
 from jyotisha.util import default_if_none
 from sanskrit_data.schema import common
 
@@ -106,6 +108,16 @@ class AngaSpan(Interval):
                              time.ist_timezone.julian_day_to_local_time_str(jd=self.jd_end))
 
 
+  def to_md_string(self, anga_type, script, reference_jd):
+    (anga_ID, anga_end_jd) = (self.anga.index, self.jd_end)
+    from jyotisha.panchaanga.temporal import AngaType
+    anga = anga_type.names_dict[script][anga_ID]
+    if anga_end_jd is None:
+      anga_end_str = ""
+    else:
+      anga_end_str = Hour(24 * (anga_end_jd - reference_jd)).to_md()
+    return f"{anga}►{anga_end_str}"
+
 class FifteenFoldDivision(common.JsonObject):
   """
   "दे॒वस्य॑ सवि॒तुᳶ प्रा॒तᳶ प्र॑स॒वᳶ प्रा॒णः" इत्यादेर् ब्राह्मणस्य भाष्ये सायणो विभागम् इमम् इच्छति।(See comments under TbSayanaMuhuurta.)
@@ -121,6 +133,10 @@ class FifteenFoldDivision(common.JsonObject):
     self.madhyaahna = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=2, num_parts=5)
     self.aparaahna = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=3, num_parts=5)
     self.saayaahna = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=4, num_parts=5)
+
+    self.puurvaahna3 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=0, num_parts=3)
+    self.madhyaahna3 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=1, num_parts=3)
+    self.aparaahna3 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=2, num_parts=3)
 
     self.praatas_sandhyaa = get_interval(start_jd=jd_previous_sunset, end_jd=jd_sunrise, part_index=14, num_parts=15) + get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=range(0,4), num_parts=15)
     self.maadhyaahnika_sandhyaa = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=range(5,13), num_parts=15)
@@ -199,7 +215,7 @@ class FifteenFoldDivision(common.JsonObject):
     if DURMUHURTA2[weekday] is None:
       self.durmuhurta2 = None
     elif DURMUHURTA2[weekday] > 15:
-      self.durmuhurta2 = get_interval(start_jd=jd_sunset, end_jd=jd_sunrise, part_index=DURMUHURTA2[weekday] - 15, num_parts=15)
+      self.durmuhurta2 = get_interval(start_jd=jd_sunset, end_jd=jd_next_sunrise, part_index=DURMUHURTA2[weekday] - 15, num_parts=15)
     else:
       self.durmuhurta2 = get_interval(start_jd=jd_sunrise, end_jd=jd_sunset, part_index=DURMUHURTA2[weekday], num_parts=15)
 

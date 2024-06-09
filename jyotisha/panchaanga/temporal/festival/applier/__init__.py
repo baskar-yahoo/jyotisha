@@ -25,12 +25,12 @@ class FestivalAssigner(PeriodicPanchaangaApplier):
     # Update festival numbers if they exist
     solar_y_start_d = []
     lunar_y_start_d = []
-    if self.daily_panchaangas[0].lunar_month_sunrise.index == 1:
+    if self.daily_panchaangas[0].lunar_date.month.index == 1:
       lunar_y_start_d.append(0)
     for d in range(1, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       if self.daily_panchaangas[d].solar_sidereal_date_sunset.month == 1 and self.daily_panchaangas[d - 1].solar_sidereal_date_sunset.month != 1:
         solar_y_start_d.append(d)
-      if self.daily_panchaangas[d].lunar_month_sunrise.index == 1 and self.daily_panchaangas[d - 1].lunar_month_sunrise.index != 1:
+      if self.daily_panchaangas[d].lunar_date.month.index == 1 and self.daily_panchaangas[d - 1].lunar_date.month.index != 1:
         lunar_y_start_d.append(d)
 
     period_start_year = self.panchaanga.start_date.year
@@ -88,8 +88,9 @@ class FestivalAssigner(PeriodicPanchaangaApplier):
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       for f in [fest.name for fest in self.daily_panchaangas[d].festival_id_to_instance.values()]:
         if f in [fest.name for fest in self.daily_panchaangas[d + 1].festival_id_to_instance.values()]:
-          self.panchaanga.delete_festival_date(fest_id=f, date=self.daily_panchaangas[d].date)
-          logging.warning('%s on both days %d and %d! Deleted %d' % (f, d, d + 1, d))
+          if 'sAyana' not in f and 'anadhyAyaH' not in f:
+            self.panchaanga.delete_festival_date(fest_id=f, date=self.daily_panchaangas[d].date)
+            logging.warning('%s on both days %d and %d! Deleted %d' % (f, d, d + 1, d))
 
 # Essential for depickling to work.
 common.update_json_class_index(sys.modules[__name__])
