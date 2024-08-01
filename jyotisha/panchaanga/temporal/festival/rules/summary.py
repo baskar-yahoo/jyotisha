@@ -53,6 +53,10 @@ def describe_fest(rule, include_images, include_shlokas, include_url, is_brief, 
   return final_description_string
 
 
+def get_url(rule):
+  return rule.get_url()
+
+
 def get_description_str_with_shlokas(include_shlokas, rule, script):
   # Get the description
   description_string = ''
@@ -130,7 +134,7 @@ def get_timing_summary(rule):
       angam += 'day %d' % rule.timing.anga_number
   else: # No timing or anga_type
     if rule.description is None:
-      logging.debug("No anga_type in %s or description even!!", rule.id)
+      logging.warning("No anga_type in %s or description even!!", rule.id)
 
   if angam is not None:
     blurb += angam

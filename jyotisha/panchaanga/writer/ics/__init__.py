@@ -48,14 +48,13 @@ def compute_calendar(panchaanga, languages=None, scripts=None, set_sequence=True
       ics_calendar.add_component(event)
     add_festival_events(day_index=day_index, ics_calendar=ics_calendar, panchaanga=panchaanga, scripts=scripts, languages=languages)
 
-    # if m == 12 and dt == 31:
-    #     break
-
   return ics_calendar
 
 
 def set_calendar_metadata(ics_calendar, panchaanga, set_sequence):
   timezone = Timezone()
+  ics_calendar.add('prodid', '-//ICS writer//github.com/jyotisha//')
+  ics_calendar.add('version', '2.0')
   timezone.add('TZID', panchaanga.city.timezone)
   ics_calendar.add_component(timezone)
   if set_sequence:

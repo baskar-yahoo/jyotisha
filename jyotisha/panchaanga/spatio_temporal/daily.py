@@ -4,10 +4,9 @@ import logging
 import sys
 from math import floor, modf
 
-from jyotisha.panchaanga.temporal.festival.rules import pancha_paxi
-from indic_transliteration import sanscript
-
 import methodtools
+from indic_transliteration import sanscript
+from sanskrit_data.schema import common
 from scipy.optimize import brentq
 from timebudget import timebudget
 
@@ -16,6 +15,7 @@ from jyotisha.panchaanga.temporal import time, ComputationSystem, set_constants,
 from jyotisha.panchaanga.temporal import zodiac
 from jyotisha.panchaanga.temporal.body import Graha
 from jyotisha.panchaanga.temporal.festival.rules import RulesRepo
+from jyotisha.panchaanga.temporal.festival.rules import pancha_paxi
 from jyotisha.panchaanga.temporal.interval import DayLengthBasedPeriods, Interval, get_interval
 from jyotisha.panchaanga.temporal.month import LunarMonthAssigner
 from jyotisha.panchaanga.temporal.names import translate_or_transliterate
@@ -23,7 +23,6 @@ from jyotisha.panchaanga.temporal.time import Timezone, Date, BasicDate, Hour
 from jyotisha.panchaanga.temporal.zodiac import Ayanamsha, NakshatraDivision, AngaSpanFinder
 from jyotisha.panchaanga.temporal.zodiac.angas import AngaType, Anga
 from jyotisha.util import default_if_none
-from sanskrit_data.schema import common
 
 timebudget.set_quiet(True)  # don't show measurements as they happen
 
@@ -40,6 +39,7 @@ class DayAngas(common.JsonObject):
     super().__init__()
     self.tithis_with_ends = None
     self.tithi_at_sunrise = None
+    self.tithi_at_noon = None
     self.nakshatras_with_ends = None
     self.nakshatra_at_sunrise = None
     self.yogas_with_ends = None
@@ -48,6 +48,7 @@ class DayAngas(common.JsonObject):
     self.solar_nakshatras_with_ends = None
     self.raashis_with_ends = None
     self.solar_raashis_with_ends = None
+    self.graha_raashis_with_ends = {}
 
   def get_angas_with_ends(self, anga_type):
     anga_spans = []
@@ -65,6 +66,8 @@ class DayAngas(common.JsonObject):
       anga_spans = self.solar_nakshatras_with_ends
     elif anga_type == AngaType.SIDEREAL_MONTH:
       anga_spans = self.solar_raashis_with_ends
+    elif anga_type in AngaType.GRAHA_RASHI.values():
+      anga_spans = self.graha_raashis_with_ends[anga_type.get_body_str()]
     return anga_spans
 
   def find_anga_span(self, anga):
@@ -106,19 +109,11 @@ class DayAngas(common.JsonObject):
       return anga_span.anga
     return None
 
-  def get_anga_data_str(self, anga_type, script, reference_jd):
+  def get_anga_data_md(self, anga_type, script, reference_jd):
     anga_data_str = ''
     angas_with_ends = self.get_angas_with_ends(anga_type=anga_type)
     for anga_span in angas_with_ends:
-      (anga_ID, anga_end_jd) = (anga_span.anga.index, anga_span.jd_end)
-      anga = anga_type.names_dict[script][anga_ID]
-      if anga_end_jd is None:
-        anga_end_str = ""
-      else:
-        anga_end_str = Hour(24 * (anga_end_jd - reference_jd)).to_string()
-      anga_data_str = '%s; %s►%s' % \
-                       (anga_data_str, anga,
-                        anga_end_str)
+      anga_data_str = f'{anga_data_str}; {anga_span.to_md_string(anga_type=anga_type, script=script, reference_jd=reference_jd)}'
     anga_data_str = '**%s** — %s' % (translate_or_transliterate(anga_type.name_hk, script), anga_data_str[2:])
     return anga_data_str
 
@@ -167,8 +162,9 @@ class DailyPanchaanga(common.JsonObject):
     self.jd_sunset = None
     self.jd_previous_sunset = None
     self.jd_next_sunrise = None
-    self.jd_moonrise = None
-    self.jd_moonset = None
+    self._previous_day_panchaanga = previous_day_panchaanga
+    self.graha_rise_jd = {}
+    self.graha_set_jd = {}
 
     self.lagna_data = None
     self.sunrise_day_angas = None
@@ -178,22 +174,24 @@ class DailyPanchaanga(common.JsonObject):
 
     self.tropical_date_sunset = None
 
-    self.lunar_month_sunrise = None
+    self.lunar_date = None
+    # self.lunar_dates_alternate = {}
     
-    self.shraaddha_tithi = []
     self.festival_id_to_instance = {}
     self.mauDhyas = None
     self.amauDhyas = None
 
-    self.compute_sun_moon_transitions(previous_day_panchaanga=previous_day_panchaanga)
+    self.compute_graha_transitions(previous_day_panchaanga=previous_day_panchaanga)
     self.compute_solar_day_sunset(previous_day_panchaanga=previous_day_panchaanga)
     self.set_tropical_date_sunset(previous_day_panchaanga=previous_day_panchaanga)
     self.day_length_based_periods = DayLengthBasedPeriods(jd_previous_sunset=self.jd_previous_sunset, jd_sunrise=self.jd_sunrise, jd_sunset=self.jd_sunset, jd_next_sunrise=self.jd_next_sunrise, weekday=self.date.get_weekday())
 
     if self.computation_system.lunar_month_assigner_type is not None:
       lunar_month_assigner = LunarMonthAssigner.get_assigner(computation_system=self.computation_system)
-      self.set_lunar_month_sunrise(month_assigner=lunar_month_assigner, previous_day_panchaanga=previous_day_panchaanga)
-      self.set_mauDhyas()
+      lunar_month_assigner.set_date(daily_panchaanga=self, previous_day_panchaanga=previous_day_panchaanga)
+
+    self.set_mauDhyas()
+    self.set_graha_raashis()
 
     if self.computation_system.festival_options.set_pancha_paxi_activities:
       self.get_pancha_paxi_activities()
@@ -207,7 +205,7 @@ class DailyPanchaanga(common.JsonObject):
   def __lt__(self, other):
     return self.date.get_date_str() < self.date.get_date_str()
 
-  def compute_sun_moon_transitions(self, previous_day_panchaanga=None, force_recomputation=False):
+  def compute_graha_transitions(self, previous_day_panchaanga=None, force_recomputation=False):
     """
 
     :param previous_day_panchaanga: Panchangam for previous day, to avoid unnecessary calculations. (rise_trans calculations can be time consuming.)
@@ -234,16 +232,18 @@ class DailyPanchaanga(common.JsonObject):
       raise (ValueError(
         'No sunset was computed. Perhaps the co-ordinates are beyond the polar circle (most likely a LAT-LONG swap! Please check your inputs.'))
 
-    if force_recomputation or self.jd_moonrise is None:
-      self.jd_moonrise = self.city.get_rising_time(julian_day_start=self.jd_sunrise, body=Graha.MOON)
-    if force_recomputation or self.jd_moonset is None:
-      self.jd_moonset = self.city.get_setting_time(julian_day_start=self.jd_sunrise, body=Graha.MOON)
+    for body in Graha.PLANETS_REVERSE_ORDER + [Graha.MOON]:
+      if force_recomputation or body not in self.graha_rise_jd:
+        self.graha_rise_jd[body] = self.city.get_rising_time(julian_day_start=self.jd_sunrise, body=body)
+      if force_recomputation or body not in self.graha_set_jd:
+        self.graha_set_jd[body] = self.city.get_setting_time(julian_day_start=self.jd_sunrise, body=body)
 
     if force_recomputation or self.sunrise_day_angas is None:
       self.sunrise_day_angas = DayAngas()
       # Deliberately passing ASHVINI_STARTING_0 below since it is cheapest. Tithi is independent of ayanAmsha. 
       self.sunrise_day_angas.tithis_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=Ayanamsha.ASHVINI_STARTING_0, anga_type=zodiac.AngaType.TITHI).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
       self.sunrise_day_angas.tithi_at_sunrise = self.sunrise_day_angas.tithis_with_ends[0].anga
+      self.sunrise_day_angas.tithi_at_noon = self.sunrise_day_angas.get_anga_at_jd(jd=(self.jd_sunrise + self.jd_sunset)/2, anga_type=zodiac.AngaType.TITHI)
       
       self.sunrise_day_angas.nakshatras_with_ends = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.NAKSHATRA).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
       self.sunrise_day_angas.nakshatra_at_sunrise = self.sunrise_day_angas.nakshatras_with_ends[0].anga
@@ -261,7 +261,7 @@ class DailyPanchaanga(common.JsonObject):
   def get_interval(self, interval_id):
     interval_id = names.devanaagarii_to_python.get(interval_id, interval_id)
     if interval_id == "moonrise":
-      return Interval(name=interval_id, jd_start=self.jd_moonrise, jd_end=self.jd_moonrise)
+      return Interval(name=interval_id, jd_start=self.graha_rise_jd[Graha.MOON], jd_end=self.graha_rise_jd[Graha.MOON])
     elif interval_id == "sunrise":
       return Interval(jd_start=self.jd_sunrise, jd_end=self.jd_sunrise, name=interval_id)
     elif interval_id == "sunset":
@@ -294,7 +294,7 @@ class DailyPanchaanga(common.JsonObject):
     """Compute the solar month and day for a given Julian day at sunset.
     """
     # If solar transition happens before the current sunset but after the previous sunset, then that is taken to be solar day 1.
-    self.compute_sun_moon_transitions(previous_day_panchaanga=previous_day_panchaanga)
+    self.compute_graha_transitions(previous_day_panchaanga=previous_day_panchaanga)
     solar_month_sunset = NakshatraDivision(jd=self.jd_sunset, ayanaamsha_id=self.computation_system.ayanaamsha_id).get_anga(
       anga_type=AngaType.SIDEREAL_MONTH)
 
@@ -334,25 +334,13 @@ class DailyPanchaanga(common.JsonObject):
         tropical_date_sunset_month = month_transitions[0].value_2
     self.tropical_date_sunset = time.BasicDateWithTransitions(month=tropical_date_sunset_month, day=tropical_date_sunset_day, month_transition=month_transition_jd)
 
-  def set_lunar_month_sunrise(self, month_assigner, previous_day_panchaanga=None):
-    if previous_day_panchaanga is not None:
-      span = previous_day_panchaanga.sunrise_day_angas.find_anga_span(Anga.get_cached(anga_type_id=AngaType.TITHI.name, index=1))
-
-      # If a prathamA tithi has started post-sunrise yesterday (and has potentially ended before today's sunrise), or if today we have a prathamA at sunrise
-      if (span is not None and span.jd_start is not None) or self.sunrise_day_angas.tithi_at_sunrise.index == 1:
-        self.lunar_month_sunrise = month_assigner.get_month_sunrise(daily_panchaanga=self)
-      else:
-        self.lunar_month_sunrise = previous_day_panchaanga.lunar_month_sunrise
-    else:
-      if  month_assigner is not None:
-        self.lunar_month_sunrise = month_assigner.get_month_sunrise(daily_panchaanga=self)
 
   def get_date(self, month_type):
     if month_type == RulesRepo.SIDEREAL_SOLAR_MONTH_DIR:
       return self.solar_sidereal_date_sunset
     elif month_type == RulesRepo.LUNAR_MONTH_DIR:
-      return BasicDate(month=self.lunar_month_sunrise.index,
-                       day=self.sunrise_day_angas.tithi_at_sunrise.index)
+      return BasicDate(month=self.lunar_date.month.index,
+                       day=self.lunar_date.index)
     elif month_type == RulesRepo.TROPICAL_MONTH_DIR:
       return self.tropical_date_sunset
     elif month_type == RulesRepo.GREGORIAN_MONTH_DIR:
@@ -366,9 +354,11 @@ class DailyPanchaanga(common.JsonObject):
       else:
         return translate_or_transliterate(names.NAMES['SIDEREAL_SOLAR_MONTH_NAMES'][language][self.solar_sidereal_date_sunset.month - 1], source_script=sanscript.DEVANAGARI, script=script)
     elif month_type == RulesRepo.LUNAR_MONTH_DIR:
-      return names.get_chandra_masa(month=self.lunar_month_sunrise.index, script=script)
+      return names.get_chandra_masa(month=self.lunar_date.month.index, script=script)
     elif month_type == RulesRepo.TROPICAL_MONTH_DIR:
       return names.NAMES['RTU_MASA_NAMES_SHORT']['sa'][script][self.tropical_date_sunset.month]
+    elif month_type == RulesRepo.LUNAR_MONTH_DIR + RulesRepo.TROPICAL_MONTH_DIR:
+      return names.get_chandra_masa(month=self.lunar_date.month.index, name_type='RTU_MASA_NAMES_SHORT', script=script)
     elif month_type == RulesRepo.ISLAMIC_MONTH_DIR:
       islamic_date = self.date.to_islamic_date()
       return names.NAMES["ARAB_MONTH_NAMES"]["ar"][islamic_date.month-1]
@@ -405,6 +395,19 @@ class DailyPanchaanga(common.JsonObject):
     return year_index
 
 
+  def get_jd_next_day_noon(self):
+    jd_next_day_sunset = self.city.get_rising_time(julian_day_start=self.jd_next_sunrise, body=Graha.SUN)
+    return (self.jd_next_sunrise + jd_next_day_sunset)/2
+
+  def get_jd_prev_day_noon(self):
+    if self._previous_day_panchaanga is not None:
+      return self._previous_day_panchaanga.get_jd_noon()
+    jd_prev_day_sunrise = self.city.get_rising_time(julian_day_start=self.jd_next_sunrise - 1.2, body=Graha.SUN)
+    return (self.jd_previous_sunset + jd_prev_day_sunrise)/2
+
+  def get_jd_noon(self):
+    return (self.jd_sunrise + self.jd_sunset)/2
+
   def get_hora_data(self, debug=False):
     """Returns the hora data
 
@@ -420,7 +423,7 @@ class DailyPanchaanga(common.JsonObject):
 
     self.hora_data = []
     if getattr(self, "jd_sunrise", None) is None or self.jd_sunrise is None:
-      self.compute_sun_moon_transitions()
+      self.compute_graha_transitions()
     
     HORA_SUNRISE = [Graha.SUN, Graha.MOON, Graha.MARS, Graha.MERCURY, Graha.JUPITER, Graha.VENUS, Graha.SATURN]
     # HORA_GRAHAS = [Graha.SUN, Graha.VENUS, Graha.MERCURY, Graha.MOON, Graha.SATURN, Graha.JUPITER, Graha.MARS]
@@ -430,12 +433,21 @@ class DailyPanchaanga(common.JsonObject):
 
     hora_list = [(x + HORA_GRAHAS.index(hora_sunrise)) % 7 for x in range(24)]
 
-    for i, hora in enumerate(hora_list[:12]):
-      hora_end_time = get_interval(start_jd=self.jd_sunrise, end_jd=self.jd_sunset, part_index=i, num_parts=12).jd_end
-      self.hora_data.append((hora, HORA_GRAHAS[hora], hora_end_time))
+    # लङ्को दग्याम्यसूत्रात् प्रथममपरतः पूर्वदेशे च पश्चाद-
+    # ध्वोत्थाभिघंटीभिः विरुदयतो वासरेश प्रवृत्तिः ।
 
-    for i, hora in enumerate(hora_list[12:]):
-      hora_end_time = get_interval(start_jd=self.jd_sunset, end_jd=self.jd_next_sunrise, part_index=i, num_parts=12).jd_end
+    # ज्ञेया सूर्योदयात् प्राक् चरशकलभवश्चासुभिर्याम्यगोले
+    # पश्चात् तैः सौम्यगोले युतिवियुतिवशाच्चोभयोः स्पष्टकालः ॥
+    # सिद्धान्तशिरोमणौ मध्यमाधिकारे भूपरिध्यध्याये ६
+
+    # Zero latitude, and traditional "Zero" longitude (traditional = Ujjayini Mahakaleshwar)
+    LANKA = City(name='Lanka', name_hk='laGkA', latitude=0, longitude=75.7682178, timezone="Asia/Kolkata")
+
+    jd_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start, body=Graha.SUN)
+    jd_next_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start + 1, body=Graha.SUN)
+
+    for i, hora in enumerate(hora_list):
+      hora_end_time = get_interval(start_jd=jd_sunrise, end_jd=self.jd_next_sunrise, part_index=i, num_parts=24).jd_end
       self.hora_data.append((hora, HORA_GRAHAS[hora], hora_end_time))
 
     return self.hora_data
@@ -456,7 +468,7 @@ class DailyPanchaanga(common.JsonObject):
 
     self.lagna_data = []
     if getattr(self, "jd_sunrise", None) is None or self.jd_sunrise is None:
-      self.compute_sun_moon_transitions()
+      self.compute_graha_transitions()
     lagna_sunrise = 1 + floor(self.city.get_lagna_float(self.jd_sunrise, ayanaamsha_id=ayanaamsha_id))
 
     lagna_list = [(x + lagna_sunrise - 1) % 12 + 1 for x in range(13)]
@@ -466,7 +478,7 @@ class DailyPanchaanga(common.JsonObject):
 
     for lagna in lagna_list:
       # print('---\n', lagna)
-      if (debug):
+      if debug:
         logging.debug(('lagna sunrise', self.city.get_lagna_float(self.jd_sunrise, ayanaamsha_id=ayanaamsha_id)))
         logging.debug(('lbrack', self.city.get_lagna_float(lbrack, int(-lagna), ayanaamsha_id=ayanaamsha_id)))
         logging.debug(('rbrack', self.city.get_lagna_float(rbrack, int(-lagna), ayanaamsha_id=ayanaamsha_id)))
@@ -484,7 +496,6 @@ class DailyPanchaanga(common.JsonObject):
     if self.paxi_activities is not None:
       return self.paxi_activities
     self.paxi_activities = PaxiActivities()
-    from jyotisha.panchaanga.temporal.festival import rules
     paxa_id = int((self.sunrise_day_angas.tithi_at_sunrise.index - 1) / 15) + 1
     activities_table = pancha_paxi.get_activities_table(weekday_id=self.date.get_weekday(), paxa_id=paxa_id)
 
@@ -531,6 +542,10 @@ class DailyPanchaanga(common.JsonObject):
     if len(amauDhyas) > 0:
       self.amauDhyas = amauDhyas
 
+
+  def set_graha_raashis(self):
+    for graha_id in [Graha.MERCURY, Graha.VENUS, Graha.MARS, Graha.JUPITER, Graha.SATURN, Graha.RAHU, Graha.KETU]:
+      self.sunrise_day_angas.graha_raashis_with_ends[graha_id] = AngaSpanFinder.get_cached(ayanaamsha_id=self.computation_system.ayanaamsha_id, anga_type=zodiac.AngaType.GRAHA_RASHI[graha_id]).get_all_angas_in_period(jd1=self.jd_sunrise, jd2=self.jd_next_sunrise)
 
 # Essential for depickling to work.
 common.update_json_class_index(sys.modules[__name__])
