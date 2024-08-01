@@ -4,7 +4,23 @@
 import logging
 import os
 import sys
-
+import logging
+import os
+import os.path
+import sys
+ 
+from pathlib import Path # if you haven't already done so
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[4]
+sys.path.append(str(root))
+ 
+# Additionally remove the current file's directory from sys.path
+try:
+    sys.path.remove(str(parent))
+except ValueError: # Already removed
+    pass
+from datetime import datetime
+from math import ceil
 from icalendar import Calendar, Timezone
 
 import jyotisha
@@ -32,9 +48,9 @@ CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 def compute_calendar(panchaanga, languages=None, scripts=None, set_sequence=True, festivals_only=False):
 
   if scripts is None:
-    scripts = [sanscript.DEVANAGARI]
+    scripts = [sanscript.TAMIL]
   if languages is None:
-    languages = ["sa"]
+    languages = ["ta"]
   ics_calendar = Calendar()
 
   set_calendar_metadata(ics_calendar, panchaanga=panchaanga, set_sequence=set_sequence)

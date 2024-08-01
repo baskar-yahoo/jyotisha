@@ -1,4 +1,4 @@
-pyswisseph==2.10.3.2
+pyswisseph==2.8.0.post1
 astropy
 scipy
 pandas
@@ -13,6 +13,7 @@ geopy
 numpy
 # Flask
 flask_restplus
+flask_restx
 flask_cors
 jsonpickle
 methodtools

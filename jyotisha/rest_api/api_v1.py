@@ -1,9 +1,9 @@
 import logging
 
-import flask_restplus
+import flask_restx
 from flask import Blueprint
-from flask_restplus import Resource
-from flask_restplus import reqparse
+from flask_restx import Resource
+from flask_restx import reqparse
 from jyotisha.panchaanga.spatio_temporal import City, daily, annual
 from jyotisha.panchaanga.temporal.body import Graha
 from jyotisha.panchaanga.temporal.time import Timezone, Date
@@ -21,7 +21,7 @@ api_blueprint = Blueprint(
   template_folder='templates'
 )
 
-api = flask_restplus.Api(app=api_blueprint, version='1.0', title='jyotisha panchanga API',
+api = flask_restx.Api(app=api_blueprint, version='1.0', title='jyotisha panchanga API',
                          description='For detailed intro and to report issues: see <a href="https://github.com/jyotisham/jyotisha">here</a>. '
                                      'A list of REST and non-REST API routes avalilable on this server: <a href="../sitemap">sitemap</a>.',
                          default_label=api_blueprint.name,
@@ -44,7 +44,25 @@ class DailyCalendarHandler(Resource):
     panchaanga = annual.get_panchaanga_for_civil_year(city=city, year=int(year))
 
     return panchaanga.to_json_map()
+@api.route('/calendars/coordinates/<string:latitude>/<string:longitude>/years/<string:year>/months/<string:month>/days/<string:day>')
+# TODO: How to set default values for latitude and logitude here??
+# Questions at: https://github.com/noirbizarre/flask-restplus/issues/381 and stackoverflow linked therein.
+class DailyCalendarHandler(Resource):
+  get_parser = reqparse.RequestParser()
+  get_parser.add_argument('timezone', type=str, default='Asia/Calcutta', help='Example: Asia/Calcutta', location='args',
+                                                          required=True)
 
+  @api.expect(get_parser)
+  def get(self, latitude, longitude, year, month, day):
+    args = self.get_parser.parse_args()
+    city = City("", latitude, longitude, args['timezone'])
+    jul_date = Date.to_julian_date(year=int(year), month=int(month), day=int(day))
+                              # panchaanga = (city=City('Chennai', '13:05:24', '80:16:12', 'Asia/Calcutta'), 
+    panchaanga = daily.DailyPanchaanga(city=city,date=Date(year=int(year), month=int(month), day=int(day)))
+
+    return panchaanga.to_json_map()
+
+                                  
 
 # noinspection PyUnresolvedReferences
 @api.route(
