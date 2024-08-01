@@ -50,10 +50,10 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
   #                3: 'blue', 4: 'blue', 5: 'blue', 6: 'blue'}
   compute_lagnams = panchaanga.computation_system.festival_options.set_lagnas
   if scripts is None:
-    scripts = [sanscript.DEVANAGARI]
+    scripts = [sanscript.HK]
   if languages is None:
-    languages = ["sa"]
-
+    languages = ["ta"]
+  print("after compute_lagnams")
   template_file = open(os.path.join(os.path.dirname(__file__), 'templates/daily_cal_template.tex'))
 
   template_lines = template_file.readlines()
@@ -86,9 +86,9 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     # compute offset from UTC in hours
     tz_off = (datetime.utcoffset(local_time).days * 86400 +
               datetime.utcoffset(local_time).seconds) / 3600.0
-
+    print("before thithi")
     tithi_data_str = get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
-
+    print("after thithi")
     nakshatra_data_str = get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
 
     yoga_data_str = get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
@@ -106,7 +106,7 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
       yname = samvatsara_names[1]
 
     # Assign samvatsara, ayana, rtu #
-    sar_data = '{%s}{%s}{%s}' % (yname,
+    sar_data = '{%s}{%s}{%s}' % ("test",
                                  names.NAMES['AYANA_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month],
                                  names.NAMES['RTU_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month])
 
@@ -120,18 +120,18 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
             24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaangas[d + 1].julian_day_start)).to_string(format=time_format))
       else:
         month_end_str = '\\mbox{%s{\\tiny\\RIGHTarrow}{%s}}' % (
-          names.NAMES['RASHI_NAMES']['sa'][scripts[0]][_m], time.Hour(
+          names.NAMES['RASHI_NAMES']['hk'][scripts[0]][_m], time.Hour(
             24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaanga.julian_day_start)).to_string(format=time_format))
 
     month_data = '\\sunmonth{%s}{%d}{%s}' % (
       names.NAMES['RASHI_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month], daily_panchaanga.solar_sidereal_date_sunset.day,
       month_end_str)
-
-    print('\\caldata{%s}{%s}{%s{%s}{%s}{%s}%s}' %
-          (names.month_map[m].upper(), dt, month_data,
-           names.get_chandra_masa(daily_panchaanga.lunar_date.month.index, scripts[0]),
-           names.NAMES['RTU_NAMES']['sa'][scripts[0]][int(ceil(daily_panchaanga.lunar_date.month.index))],
-           names.NAMES['VARA_NAMES']['sa'][scripts[0]][daily_panchaanga.date.get_weekday()], sar_data), file=output_stream)
+    print("after assignment and before caldata")
+   # print('\\caldata{%s}{%s}{%s{%s}{%s}{%s}%s}' %
+   #       (names.month_map[m].upper(), dt, month_data,
+   #        names.get_chandra_masa(daily_panchaanga.lunar_month_sunrise.index, scripts[0]),
+   #        names.NAMES['RTU_NAMES']['sa'][scripts[0]][int(ceil(daily_panchaanga.lunar_month_sunrise.index))],
+   #        names.NAMES['VARA_NAMES']['sa'][scripts[0]][daily_panchaanga.date.get_weekday()], sar_data), file=output_stream)
 
     stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format)
 
@@ -250,27 +250,29 @@ def set_top_content(output_stream, panchaanga, samvatsara_names, scripts, year):
 
 def main():
   [city_name, latitude, longitude, tz] = sys.argv[1:5]
-  year = int(sys.argv[5])
-
+  start_date = sys.argv[5]
+  end_date = sys.argv[6]
+  print(sys.argv[0]," 0 ", sys.argv[1], " 1 ", sys.argv[5], " 5 ", sys.argv[6], " 6 ")
+  print("about to emit")
   compute_lagnams = False  # Default
   scripts = [sanscript.DEVANAGARI]  # Default language is devanagari
   fmt = 'hh:mm'
 
-  if len(sys.argv) == 9:
-    compute_lagnams = True
-    fmt = sys.argv[7]
-    scripts = sys.argv[6].split(",")
-  elif len(sys.argv) == 8:
-    scripts = sys.argv[6].split(",")
-    fmt = sys.argv[7]
-    compute_lagnams = False
-  elif len(sys.argv) == 7:
-    scripts = sys.argv[6].split(",")
-    compute_lagnams = False
+  #if len(sys.argv) == 9:
+  #  compute_lagnams = True
+  #  fmt = sys.argv[7]
+  #  scripts = sys.argv[6].split(",")
+  #elif len(sys.argv) == 8:
+  #  scripts = sys.argv[6].split(",")
+  #  fmt = sys.argv[7]
+  #  compute_lagnams = False
+  #elif len(sys.argv) == 7:
+  #  scripts = sys.argv[6].split(",")
+  #  compute_lagnams = False
 
   city = City(city_name, latitude, longitude, tz)
 
-  panchaanga = jyotisha.panchaanga.spatio_temporal.annual.get_panchaanga_for_civil_year(city=city, year=year)
+  panchaanga = jyotisha.panchaanga.spatio_temporal.annual.get_panchaanga_for_given_dates(city=city, start_date=start_date, end_date=end_date)
 
   emit(panchaanga, scripts=scripts)
   # panchaanga.writeDebugLog()

@@ -87,27 +87,6 @@ def get_solar_shraaddha_tithi_data_str(daily_panchaanga, scripts, time_format):
     return '/'.join(tithi_strings)
 
 
-def get_lunar_shraaddha_tithi_data_str(daily_panchaanga, scripts, time_format):
-    if not daily_panchaanga.lunar_shraaddha_tithi:
-        return '---'
-
-    tithi_strings = []
-
-    for tithi in daily_panchaanga.lunar_shraaddha_tithi:
-      tithi_name = names.NAMES['TITHI_NAMES']['sa'][scripts[0]][tithi].split('-')[-1]
-      tithi_strings.append(tithi_name)
-
-    tithi_count = len(daily_panchaanga.lunar_shraaddha_tithi)
-    if tithi_count == 1:
-        return tithi_strings[0]
-    elif tithi_count == 2:
-        return f"{tithi_strings[0]}/{tithi_strings[1]} ({jyotisha.custom_transliteration.tr('tithidvayam', scripts[0])})"
-    elif tithi_count == 3:
-        return f"{tithi_strings[0]}/{tithi_strings[1]}/{tithi_strings[2]} ({jyotisha.custom_transliteration.tr('tithitrayam', scripts[0])})"
-
-    return '/'.join(tithi_strings)
-
-
 def get_raahu_yama_gulika_strings(daily_panchaanga, time_format):
   jd = daily_panchaanga.julian_day_start
   rahu = '%s--%s' % (
@@ -308,6 +287,7 @@ def get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panc
   tithi_data_str = ''
   for iTithi, tithi_span in enumerate(daily_panchaanga.sunrise_day_angas.tithis_with_ends):
     (tithi_ID, tithi_end_jd) = (tithi_span.anga.index, tithi_span.jd_end)
+    #print ("tithi_ID=", tithi_ID, "tithi_end_jd= ",tithi_end_jd)
     tithi = '\\tithi{%d}{%s}' % (tithi_ID,
             names.NAMES['TITHI_NAMES']['sa'][scripts[0]][tithi_ID])
     if tithi_end_jd is None:
