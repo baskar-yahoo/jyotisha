@@ -181,8 +181,13 @@ class EclipticFestivalAssigner(FestivalAssigner):
       for i, transit in enumerate(transits):
         (jd_transit, rashi1, rashi2) = (transit.jd, transit.value_1, transit.value_2)
         if self.panchaanga.jd_start - 13 < jd_transit < jd_end:
-          fday = int(floor(jd_transit) - floor(self.daily_panchaangas[0].julian_day_start))
-          fest = TransitionFestivalInstance(name='guru-saGkrAntiH', status_1_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], status_2_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2])
+          fday = int(jd_transit - self.daily_panchaangas[0].julian_day_start)
+          # if jd_transit < self.daily_panchaangas[fday].julian_day_start:
+          #   fday -= 1
+          fest = TransitionFestivalInstance(name='guru-saGkrAntiH', 
+            status_1_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], 
+            status_2_hk=names.NAMES['RASHI_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], interval
+            =Interval(jd_start=jd_transit, jd_end=None))
           self.panchaanga.add_festival_instance(festival_instance=fest, date=self.daily_panchaangas[fday].date)
           if (rashi1 % 12 + 1) == rashi2 and ((transits[i + 1].value_1 % 12) + 1) == transits[i + 1].value_2:
             # Considering only non-retrograde transits for pushkara computations
@@ -194,9 +199,9 @@ class EclipticFestivalAssigner(FestivalAssigner):
             else:
               fday_pushkara = fday + 1
             self.panchaanga.add_festival(
-              fest_id='%s-Adi-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date)
+              fest_id='%s-Adya-puSkara-ArambhaH' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date)
             self.panchaanga.add_festival(
-              fest_id='%s-Adi-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date + 11)
+              fest_id='%s-Adya-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi2], date=self.daily_panchaangas[fday_pushkara].date + 11)
             self.panchaanga.add_festival(
               fest_id='%s-antya-puSkara-samApanam' % names.NAMES['PUSHKARA_NAMES']['sa'][sanscript.roman.HK_DRAVIDIAN][rashi1], date=self.daily_panchaangas[fday_pushkara].date - 1)
             self.panchaanga.add_festival(
