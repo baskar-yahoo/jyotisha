@@ -29,11 +29,21 @@ class VaraFestivalAssigner(FestivalAssigner):
       return 
     for d in range(self.panchaanga.duration_prior_padding, self.panchaanga.duration + self.panchaanga.duration_prior_padding):
       # BHRGUVARA SUBRAHMANYA VRATAM
-      if self.daily_panchaangas[d].solar_sidereal_date_sunset.month == 7 and self.daily_panchaangas[d].date.get_weekday() == 5:
+      day_panchaanga = self.daily_panchaangas[d]
+      if day_panchaanga.solar_sidereal_date_sunset.month == 7 and day_panchaanga.date.get_weekday() == 5:
         if festival_name not in self.panchaanga.festival_id_to_days:
           # only the first bhRguvAra of tulA mAsa is considered (skAnda purANam)
           # https://youtu.be/rgXwyo0L3i8?t=222
-          self.panchaanga.add_festival(fest_id=festival_name, date=self.daily_panchaangas[d].date)
+          if day_panchaanga.solar_sidereal_date_sunset.day == 1:
+            madhyaahna_start = day_panchaanga.day_length_based_periods.fifteen_fold_division.madhyaahna.jd_start
+            sankranti_time = day_panchaanga.solar_sidereal_date_sunset.month_transition
+            if sankranti_time is None or sankranti_time < madhyaahna_start:
+              self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
+            else:
+              self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date + 7)
+          else:
+            self.panchaanga.add_festival(fest_id=festival_name, date=day_panchaanga.date)
+
 
   def assign_masa_vara_yoga_kaarttika(self):
     festival_name = 'kArttika~sOmavAsaraH'
@@ -106,7 +116,7 @@ class VaraFestivalAssigner(FestivalAssigner):
       return 
 
     AMRITA_SIDDHI_YOGAS = [(13, 0, 'Adityahasta'), (8, 0, 'ravipuSya'),
-                 (22, 1, 'sOmazrAvaNI'), (5, 1, 'sOmamRgazIrSa'),
+                 (22, 1, 'sOmazravaNa'), (5, 1, 'sOmamRgazIrSa'),
                  (1, 2, 'bhaumAzvinI'), 
                  (17, 3, 'budhAnurAdhA'), (8, 4, 'gurupuSya'),
                  (27, 5, 'bhRgurEvatI'), (4, 6, 'zanirOhiNI')]

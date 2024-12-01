@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Dict
 
 import methodtools
+import regex
 from timebudget import timebudget
 
 from jyotisha.panchaanga.spatio_temporal import daily
@@ -164,11 +165,12 @@ class Panchaanga(common.JsonObject):
     solar.SolarFestivalAssigner(panchaanga=self).assign_all()
     vaara.VaraFestivalAssigner(panchaanga=self).assign_all()
     generic_assigner = FestivalAssigner(panchaanga=self)
-    generic_assigner.cleanup_festivals()
     rule_lookup_assigner.assign_relative_festivals()
     # self._sync_festivals_dict_and_daily_festivals(here_to_daily=True, daily_to_here=True)
     generic_assigner.assign_festival_numbers()
     tithi_festival.TithiFestivalAssigner(panchaanga=self).assign_relative_anadhyayana_days()
+    generic_assigner.cleanup_anadhyayana_festivals()
+    generic_assigner.cleanup_festivals()
     self.clear_padding_day_festivals()
 
 
@@ -201,7 +203,12 @@ class Panchaanga(common.JsonObject):
 
   def add_festival(self, fest_id, date, interval_id="full_day"):
     if date.get_date_str() not in self.date_str_to_panchaanga:
+      return
+    excluded_id_pattern = self.computation_system.festival_options.get_fest_id_pattern_excluded()
+    if excluded_id_pattern.fullmatch(fest_id):
       return 
+
+
     interval = self.date_str_to_panchaanga[date.get_date_str()].get_interval(interval_id=interval_id)
     self.add_festival_instance(date=date, festival_instance=FestivalInstance(name=fest_id, interval=interval))
 

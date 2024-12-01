@@ -9,6 +9,7 @@ from indic_transliteration import sanscript
 from sanskrit_data.schema import common
 from scipy.optimize import brentq
 from timebudget import timebudget
+import swisseph
 
 from jyotisha.panchaanga.spatio_temporal import City
 from jyotisha.panchaanga.temporal import time, ComputationSystem, set_constants, names, era, body
@@ -327,11 +328,11 @@ class DailyPanchaanga(common.JsonObject):
       month_transitions = Graha.singleton(Graha.SUN).get_transits(jd_start=self.jd_sunset-approx_day-5, jd_end=self.jd_sunset + 4, anga_type=AngaType.RASHI, ayanaamsha_id=Ayanamsha.ASHVINI_STARTING_0)
       if month_transitions[-1].jd > self.jd_previous_sunset and month_transitions[-1].jd <= self.jd_sunset:
         tropical_date_sunset_day = 1
-        tropical_date_sunset_month = month_transitions[-1].value_2
+        tropical_date_sunset_month = month_transitions[-1].value_2  % 12 + 1 
         month_transition_jd = month_transitions[-1].jd
       else:
         tropical_date_sunset_day = len(self.city.get_sunsets_in_period(jd_start=month_transitions[0].jd, jd_end=self.jd_sunset + 1/48.0))
-        tropical_date_sunset_month = month_transitions[0].value_2
+        tropical_date_sunset_month = month_transitions[0].value_2 % 12 + 1
     self.tropical_date_sunset = time.BasicDateWithTransitions(month=tropical_date_sunset_month, day=tropical_date_sunset_day, month_transition=month_transition_jd)
 
 
@@ -443,11 +444,11 @@ class DailyPanchaanga(common.JsonObject):
     # Zero latitude, and traditional "Zero" longitude (traditional = Ujjayini Mahakaleshwar)
     LANKA = City(name='Lanka', name_hk='laGkA', latitude=0, longitude=75.7682178, timezone="Asia/Kolkata")
 
-    jd_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start, body=Graha.SUN)
-    jd_next_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start + 1, body=Graha.SUN)
+    lanka_jd_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start, body=Graha.SUN)
+    lanka_jd_next_sunrise = LANKA.get_rising_time(julian_day_start=self.julian_day_start + 1, body=Graha.SUN)
 
     for i, hora in enumerate(hora_list):
-      hora_end_time = get_interval(start_jd=jd_sunrise, end_jd=self.jd_next_sunrise, part_index=i, num_parts=24).jd_end
+      hora_end_time = get_interval(start_jd=lanka_jd_sunrise, end_jd=lanka_jd_next_sunrise, part_index=i, num_parts=24).jd_end
       self.hora_data.append((hora, HORA_GRAHAS[hora], hora_end_time))
 
     return self.hora_data
