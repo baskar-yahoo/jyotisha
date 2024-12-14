@@ -32,7 +32,7 @@ from jyotisha.panchaanga.spatio_temporal import City
 from jyotisha.panchaanga.temporal import time
 from jyotisha.panchaanga.temporal.festival import rules
 from jyotisha.panchaanga.temporal.time import Timezone
-from jyotisha.panchaanga.writer.tex.svajana_day_details import get_lagna_data_str, get_raahu_yama_gulika_strings, \
+from jyotisha.panchaanga.writer.svajana.svajana_day_details import get_lagna_data_str, get_raahu_yama_gulika_strings, \
   get_karaNa_data_str, get_yoga_data_str, get_raashi_data_str, get_nakshatra_data_str, get_tithi_data_str
 
 logging.basicConfig(
