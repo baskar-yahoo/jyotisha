@@ -38,10 +38,7 @@ def get_lagna_data_str(daily_panchaanga, scripts, time_format):
   lagna_data_str = jyotisha.custom_transliteration.tr('lagnAni—', scripts[0])
   for lagna_ID, lagna_end_jd in daily_panchaanga.lagna_data:
     lagna = names.NAMES['RASHI_NAMES']['sa'][scripts[0]][lagna_ID]
-    lagna_data_str = '%s\\lagna{%s}{%s} ' % \
-                     (lagna_data_str, lagna,
-                      time.Hour(24 * (lagna_end_jd - jd)).to_string(
-                        format=time_format))
+    lagna_data_str = (lagna_data_str, lagna,time.Hour(24 * (lagna_end_jd - jd)).to_string(format=time_format))
   return lagna_data_str
 
 
@@ -52,10 +49,7 @@ def get_hora_data_str(daily_panchaanga, scripts, time_format):
 
   for hora_ID, hora_graha_name, hora_end_jd in daily_panchaanga.hora_data:
     hora = jyotisha.custom_transliteration.tr(GRAHA_NAMES[hora_graha_name], scripts[0])
-    hora_data_str = '%s\\hora{%s}{%s} ' % \
-                     (hora_data_str, hora,
-                      time.Hour(24 * (hora_end_jd - jd)).to_string(
-                        format=time_format))
+    hora_data_str = (hora_data_str, hora,time.Hour(24 * (hora_end_jd - jd)).to_string(format=time_format))
   return hora_data_str
 
 def get_solar_shraaddha_tithi_data_str(daily_panchaanga, scripts, time_format):
@@ -139,14 +133,14 @@ def get_karaNa_data_str(daily_panchaanga, scripts, time_format, previous_day_pan
     #     karana_data_str += '\\hspace{1ex}'
     karana = names.NAMES['KARANA_NAMES']['sa'][scripts[0]][karana_ID]
     if karana_end_jd is None:
-      karana_data_str = '%su karana %s' % \
+      karana_data_str = '%s  %s' % \
                         (karana_data_str, karana)
     else:
       if relative_nadikas:
         time_string = _get_relative_nadikas(karana_end_jd, daily_panchaanga)
       else:
         time_string = time.Hour(24 * (karana_end_jd - daily_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-      karana_data_str = '%s karana %s time :%s' % \
+      karana_data_str = '%s %s %s' % \
                         (karana_data_str, karana,
                          #time_string,
                          time.Hour(24 * (karana_end_jd - jd)).to_string(format=time_format))
@@ -163,7 +157,7 @@ def get_karaNa_data_str(daily_panchaanga, scripts, time_format, previous_day_pan
           time_string = _get_relative_nadikas(karana_end_jd, daily_panchaanga)
         else:
           time_string = time.Hour(24 * (karana_end_jd - previous_day_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-        karana_data_str = 'prev karana %s time*%s' % \
+        karana_data_str = '%s *%s' % \
                         (karana,
                          #time_string,
                          time.Hour(24 * (karana_end_jd - jd)).to_string(format=time_format)) + karana_data_str
@@ -181,20 +175,20 @@ def get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panch
     yoga = names.NAMES['YOGA_NAMES']['sa'][scripts[0]][yoga_ID]
     if yoga_end_jd is None:
       if iYoga == 0:
-        yoga_data_str = '%s full yoga%s' % (yoga_data_str, yoga)
+        yoga_data_str = '%s  %s' % (yoga_data_str, yoga)
       else:
-        yoga_data_str = '%s u yoga%s}' % (yoga_data_str, yoga)
+        yoga_data_str = '%s %s' % (yoga_data_str, yoga)
     else:
       if relative_nadikas:
         time_string = _get_relative_nadikas(yoga_end_jd, daily_panchaanga)
       else:
         time_string = time.Hour(24 * (yoga_end_jd - daily_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-      yoga_data_str = '%s yoga %s time %s' % \
+      yoga_data_str = '%s %s %s' % \
                       (yoga_data_str, yoga,
                        #time_string,
                        time.Hour(24 * (yoga_end_jd - jd)).to_string(format=time_format))
   if yoga_end_jd is not None:
-    yoga_data_str += ' u yoga %s' % (
+    yoga_data_str += ' %s' % (
       names.NAMES['YOGA_NAMES']['sa'][scripts[0]][(yoga_ID % 27) + 1])
 
   if include_early_end_angas:
@@ -209,7 +203,7 @@ def get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panch
           time_string = _get_relative_nadikas(yoga_end_jd, daily_panchaanga)
         else:
           time_string = time.Hour(24 * (yoga_end_jd - previous_day_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-        yoga_data_str = 'prev yoga : %s time* %s' % \
+        yoga_data_str = '%s *%s' % \
                         (yoga,
                          #time_string,
                          time.Hour(24 * (yoga_end_jd - jd)).to_string(format=time_format)) + yoga_data_str
@@ -219,7 +213,7 @@ def get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panch
 
 def get_raashi_data_str(daily_panchaanga, scripts, time_format):
   jd = daily_panchaanga.julian_day_start
-  raashi_data_str = custom_transliteration.tr('candrarAziH—', scripts[0])
+  raashi_data_str = 'चन्द्रराशिः'
   for iRaashi, raashi_span in enumerate(daily_panchaanga.sunrise_day_angas.raashis_with_ends):
     if iRaashi == 0:
       (raashi_ID, raashi_end_jd) = (raashi_span.anga.index, raashi_span.jd_end)
@@ -229,7 +223,7 @@ def get_raashi_data_str(daily_panchaanga, scripts, time_format):
       if raashi_end_jd is None:
         raashi_data_str = '%s : %s' % (raashi_data_str, raashi)
       else:
-        raashi_data_str = '%s : %s time %s' % \
+        raashi_data_str = '%s : %s  %s' % \
                          (raashi_data_str, raashi,
                           time.Hour(24 * (raashi_end_jd - jd)).to_string(
                             format=time_format))
@@ -253,7 +247,7 @@ def get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_
         time_string = _get_relative_nadikas(nakshatra_end_jd, daily_panchaanga)
       else:
         time_string = time.Hour(24 * (nakshatra_end_jd - daily_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-      nakshatra_data_str = '%snakshatra:%s time:%s' % \
+      nakshatra_data_str = '%s %s %s' % \
                            (nakshatra_data_str, nakshatra,
                             #time_string,                            
                             time.Hour(24 * (nakshatra_end_jd - jd)).to_string(format=time_format))
@@ -273,7 +267,7 @@ def get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_
         else:
           time_string = time.Hour(24 * (nakshatra_end_jd - previous_day_panchaanga.jd_sunrise)).to_string(format='gg-pp')
 
-        nakshatra_data_str = 'prev nakshatra:%s time:%s' % \
+        nakshatra_data_str = '%s %s' % \
                         (nakshatra,
                          #time_string,
                          time.Hour(24 * (nakshatra_end_jd - jd)).to_string(format=time_format)) + nakshatra_data_str
@@ -288,22 +282,22 @@ def get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panc
   for iTithi, tithi_span in enumerate(daily_panchaanga.sunrise_day_angas.tithis_with_ends):
     (tithi_ID, tithi_end_jd) = (tithi_span.anga.index, tithi_span.jd_end)
     #print ("tithi_ID=", tithi_ID, "tithi_end_jd= ",tithi_end_jd)
-    tithi = 'tithi%d:%s' % (tithi_ID,
+    tithi = '%s' % (#tithi_ID,
             names.NAMES['TITHI_NAMES']['sa'][scripts[0]][tithi_ID])
     if tithi_end_jd is None:
       if iTithi == 0:
-        tithi_data_str = '%s fulltithi %s' % (tithi_data_str, tithi)
+        tithi_data_str = '%s  %s' % (tithi_data_str, tithi)
     else:
       if relative_nadikas:
         time_string = _get_relative_nadikas(tithi_end_jd, daily_panchaanga)
       else:
         time_string = time.Hour(24 * (tithi_end_jd - daily_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-      tithi_data_str = ' %s  %s time %s' % \
+      tithi_data_str = ' %s  %s %s' % \
                        (tithi_data_str, tithi,
                         #time_string,
                         time.Hour(24 * (tithi_end_jd - jd)).to_string(format=time_format))
     if iTithi == 2:
-      tithi_data_str += '\\avamA{}'
+      tithi_data_str += 'avamA'
 
   if include_early_end_angas:
     if previous_day_panchaanga is None:
@@ -311,13 +305,14 @@ def get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panc
     if len(previous_day_panchaanga.sunrise_day_angas.tithis_with_ends) > 1:
       tithi_span = previous_day_panchaanga.sunrise_day_angas.tithis_with_ends[-2]
       (tithi_ID, tithi_end_jd) = (tithi_span.anga.index, tithi_span.jd_end)
-      tithi = '\\tithi{%d}{%s}' % (tithi_ID, names.NAMES['TITHI_NAMES']['sa'][scripts[0]][tithi_ID])
+      tithi = '%s' % (#tithi_ID, 
+                        names.NAMES['TITHI_NAMES']['sa'][scripts[0]][tithi_ID])
       if tithi_span.jd_end is not None and  tithi_span.jd_end > previous_day_panchaanga.day_length_based_periods.fifteen_fold_division.saura.jd_start:
         if relative_nadikas:
           time_string = _get_relative_nadikas(tithi_end_jd, daily_panchaanga)
         else:
           time_string = time.Hour(24 * (tithi_end_jd - previous_day_panchaanga.jd_sunrise)).to_string(format='gg-pp')
-        tithi_data_str = '\\prev{\\anga{%s}{\\time{*%s}{%s}}}\\' % \
+        tithi_data_str = '%s *%s %s' % \
                         (tithi,
                          time_string,
                          time.Hour(24 * (tithi_end_jd - jd)).to_string(format=time_format)) + tithi_data_str

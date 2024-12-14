@@ -5,7 +5,7 @@ import logging
 import os
 import os.path
 import sys
-import csv
+import csv as csv
 from pathlib import Path # if you haven't already done so
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[4]
@@ -45,7 +45,7 @@ CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 def dict_to_tsv(data, filename):
     """Converts a dictionary to a TSV file."""
     print('file name',filename, 'data',data)
-    with open(filename, 'w', newline='') as tsvfile:
+    with open(filename, 'w', newline='', encoding='utf-8') as tsvfile:
         writer = csv.writer(tsvfile, delimiter='\t')
 
         # Write header row (if desired)
@@ -65,9 +65,9 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
   panchdict={}
   compute_lagnams = panchaanga.computation_system.festival_options.set_lagnas
   if scripts is None:
-    scripts = [sanscript.ITRANS]
+    scripts = [sanscript.iast]
   if languages is None:
-    languages = ['itrans']
+    languages = ['sa']
  # print("after compute_lagnams")
  # template_file = open(os.path.join(os.path.dirname(__file__), 'templates/daily_cal_template.tex'))
 
@@ -78,13 +78,13 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
   year = panchaanga.start_date.year
   print("Year", year)
   #logging.debug(year)
-  panchdict['year']=year
+  #panchdict['year']=year
   samvatsara_id = (year - 1568) % 60 + 1  # distance from prabhava
   samvatsara_names = (names.NAMES['SAMVATSARA_NAMES']['sa'][scripts[0]][samvatsara_id],
                       names.NAMES['SAMVATSARA_NAMES']['sa'][scripts[0]][(samvatsara_id % 60) + 1])
 
-  yname = samvatsara_names[0]  # Assign year name until Mesha Sankranti
-  panchdict['yname']=yname
+  yname = samvatsara_names[1]  # Assign year name until Mesha Sankranti
+  panchdict['yname']= jyotisha.custom_transliteration.tr(yname,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
   print("panchdata",panchdata)
   set_top_content(output_stream, panchaanga, samvatsara_names, scripts, year)
   
@@ -97,7 +97,7 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     if daily_panchaanga.date < panchaanga.start_date or daily_panchaanga.date > panchaanga.end_date:
       continue
     [y, m, dt] = [daily_panchaanga.date.year, daily_panchaanga.date.month, daily_panchaanga.date.day]
-    panchdict['year1']=y
+    panchdict['year']=y
     panchdict['month1']=m
     panchdict['day1']=dt
 
@@ -112,15 +112,15 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     tithi_data_str = get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
     #print("after thithi")
     nakshatra_data_str = get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
-    panchdict['tithi_data_str']=tithi_data_str
+    panchdict['tithi_data_str']=jyotisha.custom_transliteration.tr(tithi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     yoga_data_str = get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
-    panchdict['yoga_data_str']=yoga_data_str
+    panchdict['yoga_data_str']=jyotisha.custom_transliteration.tr(yoga_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     karana_data_str = get_karaNa_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
-    panchdict['karana_data_str']=karana_data_str
+    panchdict['karana_data_str']= jyotisha.custom_transliteration.tr(karana_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     rashi_data_str = get_raashi_data_str(daily_panchaanga, scripts, time_format)
-    panchdict['rashi_data_str']=rashi_data_str
+    panchdict['rashi_data_str']=jyotisha.custom_transliteration.tr(rashi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     lagna_data_str = get_lagna_data_str(daily_panchaanga, scripts, time_format) if compute_lagnams else ''
-    panchdict['lagna_data_str']=lagna_data_str
+    panchdict['lagna_data_str']=jyotisha.custom_transliteration.tr(lagna_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
 
     gulika, rahu, yama, raatri_gulika, raatri_yama, durmuhurta1, durmuhurta2 = get_raahu_yama_gulika_strings(daily_panchaanga, time_format)
     panchdict['gulika']=gulika
@@ -135,10 +135,10 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
       yname = samvatsara_names[1]
       panchdict['yname']=yname
     # Assign samvatsara, ayana, rtu #
-    sar_data = ("test",
-                                 names.NAMES['AYANA_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month],
-                                 names.NAMES['RTU_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month])
-    panchdict['sar_data']=sar_data
+    ayana = names.NAMES['AYANA_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    rtu= names.NAMES['RTU_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    panchdict['ayana ']=jyotisha.custom_transliteration.tr(ayana,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    panchdict['rtu']=jyotisha.custom_transliteration.tr(rtu,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     if daily_panchaanga.solar_sidereal_date_sunset.month_transition is None:
       month_end_str = ''
     else:
@@ -152,10 +152,10 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
           names.NAMES['RASHI_NAMES']['hk'][scripts[0]][_m], time.Hour(
             24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaanga.julian_day_start)).to_string(format=time_format))
     panchdict['month_end_str']=month_end_str
-    month_data = (
-      names.NAMES['RASHI_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month], daily_panchaanga.solar_sidereal_date_sunset.day,
-      month_end_str)
-    panchdict['month_data']=month_data
+    month_name = names.NAMES['RASHI_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    month_date = daily_panchaanga.solar_sidereal_date_sunset.day_transition
+    panchdict['month_name']=jyotisha.custom_transliteration.tr(month_name,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    panchdict['month_date']=month_date
     print("after assignment and before caldata")
    # print('\\caldata{%s}{%s}{%s{%s}{%s}{%s}%s}' %
    #       (names.month_map[m].upper(), dt, month_data,
@@ -167,7 +167,7 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     #panchdict['sun_moon_rise_data']=sun_moon_rise_data
     stream_daylength_based_periods(daily_panchaanga, output_stream, time_format)
     #panchdict['daylength_based_periods']=daylength_based_periods
-    print( jyotisha.custom_transliteration.tr(tithi_data_str,'iast',titled=True,source_script=sanscript.brahmic.DEVANAGARI), nakshatra_data_str, rashi_data_str, yoga_data_str,
+    print( jyotisha.custom_transliteration.tr(tithi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI), nakshatra_data_str, rashi_data_str, yoga_data_str,
              karana_data_str, lagna_data_str, file=output_stream)
 
     #print_festivals_to_stream(daily_panchaanga, output_stream, panchaanga, languages, scripts)
@@ -284,8 +284,8 @@ def print_festivals_to_stream(daily_panchaanga, output_stream, panchaanga, langu
 
 def set_top_content(output_stream, panchaanga, samvatsara_names, scripts, year):
   print( year, file=output_stream)
-  print( jyotisha.custom_transliteration.tr(samvatsara_names[0],'iast',titled=True,source_script=sanscript.brahmic.DEVANAGARI), 
-         jyotisha.custom_transliteration.tr(samvatsara_names[1],'iast',titled=True,source_script=sanscript.brahmic.DEVANAGARI),file=output_stream)
+  print( jyotisha.custom_transliteration.tr(samvatsara_names[0],'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI), 
+         jyotisha.custom_transliteration.tr(samvatsara_names[1],'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI),file=output_stream)
   print( jyotisha.custom_transliteration.tr('kali', 'iast'), file=output_stream)
   print( (year + 3100, year + 3101), file=output_stream)
   print( panchaanga.city.name, file=output_stream)
