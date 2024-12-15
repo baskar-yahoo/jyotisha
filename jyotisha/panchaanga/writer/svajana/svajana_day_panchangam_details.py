@@ -6,6 +6,7 @@ import os
 import os.path
 import sys
 import csv as csv
+import copy
 from pathlib import Path # if you haven't already done so
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[4]
@@ -44,7 +45,7 @@ CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 def dict_to_tsv(data, filename):
     """Converts a dictionary to a TSV file."""
-    print('file name',filename, 'data',data)
+    #print('file name',filename, 'data',data)
     with open(filename, 'w', newline='', encoding='utf-8') as tsvfile:
         writer = csv.writer(tsvfile, delimiter='\t')
 
@@ -54,6 +55,7 @@ def dict_to_tsv(data, filename):
 
         # Write data rows
         for row in data:
+            #print('\n row',row)
             writer.writerow(row.values())
 
 def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_stream=None, panchdata=[]):
@@ -76,16 +78,15 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     #print(template_lines[i][:-1], file=output_stream)
 
   year = panchaanga.start_date.year
-  print("Year", year)
+  #print("Year", year)
   #logging.debug(year)
   #panchdict['year']=year
   samvatsara_id = (year - 1568) % 60 + 1  # distance from prabhava
   samvatsara_names = (names.NAMES['SAMVATSARA_NAMES']['sa'][scripts[0]][samvatsara_id],
                       names.NAMES['SAMVATSARA_NAMES']['sa'][scripts[0]][(samvatsara_id % 60) + 1])
 
-  yname = samvatsara_names[1]  # Assign year name until Mesha Sankranti
-  panchdict['yname']= jyotisha.custom_transliteration.tr(yname,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
-  print("panchdata",panchdata)
+  yname = samvatsara_names[0]  # Assign year name until Mesha Sankranti
+  #print("panchdata",panchdata)
   set_top_content(output_stream, panchaanga, samvatsara_names, scripts, year)
   
   daily_panchaangas = panchaanga.daily_panchaangas_sorted()
@@ -100,7 +101,6 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     panchdict['year']=y
     panchdict['month1']=m
     panchdict['day1']=dt
-
     # checking @ 6am local - can we do any better?
     local_time = tz(panchaanga.city.timezone).localize(datetime(y, m, dt, 6, 0, 0))
     panchdict['local_time']=local_time
@@ -108,10 +108,40 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     tz_off = (datetime.utcoffset(local_time).days * 86400 +
               datetime.utcoffset(local_time).seconds) / 3600.0
     panchdict['tz_off']=tz_off
+    if daily_panchaanga.solar_sidereal_date_sunset.month == 1:
+      # Flip the year name for the remaining days
+      yname = samvatsara_names[1]
+    #panchdict['yname']=yname
+    # Assign samvatsara, ayana, rtu #
+    panchdict['yname']= jyotisha.custom_transliteration.tr(yname,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    ayana = names.NAMES['AYANA_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    rtu= names.NAMES['RTU_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    panchdict['ayana ']=jyotisha.custom_transliteration.tr(ayana,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    panchdict['rtu']=jyotisha.custom_transliteration.tr(rtu,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    if daily_panchaanga.solar_sidereal_date_sunset.month_transition is None:
+      month_end_str = ''
+    else:
+      _m = daily_panchaangas[d - 1].solar_sidereal_date_sunset.month
+      if daily_panchaanga.solar_sidereal_date_sunset.month_transition >= daily_panchaangas[d + 1].jd_sunrise:
+        month_end_str = names.NAMES['RASHI_NAMES']['sa'][scripts[0]][_m]+' '+ time.Hour(
+            24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaangas[d + 1].julian_day_start)).to_string(format=time_format)
+      else:
+        month_end_str =  names.NAMES['RASHI_NAMES']['sa'][scripts[0]][_m]+' '+ time.Hour(
+            24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaanga.julian_day_start)).to_string(format=time_format)
+    month_name = names.NAMES['RASHI_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
+    month_date = daily_panchaanga.solar_sidereal_date_sunset.day
+    panchdict['month_name']=jyotisha.custom_transliteration.tr(month_name,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    panchdict['month_date']=month_date
+    panchdict['month_end_str']=jyotisha.custom_transliteration.tr(month_end_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
+    stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format)
+    #panchdict['sun_moon_rise_data']=sun_moon_rise_data
+    stream_daylength_based_periods(daily_panchaanga, output_stream, time_format)
+    #panchdict['daylength_based_periods']=daylength_based_periods
     #print("before thithi")
+    nakshatra_data_str = get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
+    panchdict['nakshatra_data_str']=jyotisha.custom_transliteration.tr(nakshatra_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)  
     tithi_data_str = get_tithi_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
     #print("after thithi")
-    nakshatra_data_str = get_nakshatra_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
     panchdict['tithi_data_str']=jyotisha.custom_transliteration.tr(tithi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
     yoga_data_str = get_yoga_data_str(daily_panchaanga, scripts, time_format, previous_day_panchaanga, include_early_end_angas=True)
     panchdict['yoga_data_str']=jyotisha.custom_transliteration.tr(yoga_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
@@ -130,55 +160,27 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
     panchdict['raatri_yama']=raatri_yama
     panchdict['durmuhurta1']=durmuhurta1
     panchdict['durmuhurta2']=durmuhurta2 
-    if daily_panchaanga.solar_sidereal_date_sunset.month == 1:
-      # Flip the year name for the remaining days
-      yname = samvatsara_names[1]
-      panchdict['yname']=yname
-    # Assign samvatsara, ayana, rtu #
-    ayana = names.NAMES['AYANA_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
-    rtu= names.NAMES['RTU_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
-    panchdict['ayana ']=jyotisha.custom_transliteration.tr(ayana,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
-    panchdict['rtu']=jyotisha.custom_transliteration.tr(rtu,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
-    if daily_panchaanga.solar_sidereal_date_sunset.month_transition is None:
-      month_end_str = ''
-    else:
-      _m = daily_panchaangas[d - 1].solar_sidereal_date_sunset.month
-      if daily_panchaanga.solar_sidereal_date_sunset.month_transition >= daily_panchaangas[d + 1].jd_sunrise:
-        month_end_str = (
-          names.NAMES['RASHI_NAMES']['sa'][scripts[0]][_m], time.Hour(
-            24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaangas[d + 1].julian_day_start)).to_string(format=time_format))
-      else:
-        month_end_str =  (
-          names.NAMES['RASHI_NAMES']['hk'][scripts[0]][_m], time.Hour(
-            24 * (daily_panchaanga.solar_sidereal_date_sunset.month_transition - daily_panchaanga.julian_day_start)).to_string(format=time_format))
-    panchdict['month_end_str']=month_end_str
-    month_name = names.NAMES['RASHI_NAMES']['sa'][scripts[0]][daily_panchaanga.solar_sidereal_date_sunset.month]
-    month_date = daily_panchaanga.solar_sidereal_date_sunset.day_transition
-    panchdict['month_name']=jyotisha.custom_transliteration.tr(month_name,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI)
-    panchdict['month_date']=month_date
-    print("after assignment and before caldata")
+        #print("after assignment and before caldata")
    # print('\\caldata{%s}{%s}{%s{%s}{%s}{%s}%s}' %
    #       (names.month_map[m].upper(), dt, month_data,
    #        names.get_chandra_masa(daily_panchaanga.lunar_month_sunrise.index, scripts[0]),
    #        names.NAMES['RTU_NAMES']['sa'][scripts[0]][int(ceil(daily_panchaanga.lunar_month_sunrise.index))],
    #        names.NAMES['VARA_NAMES']['sa'][scripts[0]][daily_panchaanga.date.get_weekday()], sar_data), file=output_stream)
 
-    stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format)
-    #panchdict['sun_moon_rise_data']=sun_moon_rise_data
-    stream_daylength_based_periods(daily_panchaanga, output_stream, time_format)
-    #panchdict['daylength_based_periods']=daylength_based_periods
-    print( jyotisha.custom_transliteration.tr(tithi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI), nakshatra_data_str, rashi_data_str, yoga_data_str,
-             karana_data_str, lagna_data_str, file=output_stream)
+    #print( jyotisha.custom_transliteration.tr(tithi_data_str,'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI), nakshatra_data_str, rashi_data_str, yoga_data_str,
+    #         karana_data_str, lagna_data_str, file=output_stream)
 
-    #print_festivals_to_stream(daily_panchaanga, output_stream, panchaanga, languages, scripts)
+    print_festivals_to_stream(daily_panchaanga, output_stream, panchaanga, languages, scripts)
 
-    print(panchaanga.start_date, names.weekday_short_map[daily_panchaanga.date.get_weekday()], file=output_stream)
-    print('raghu: ',rahu, 'yama: ',yama, 'gulika: ',gulika, file=output_stream)
+    #print(panchaanga.start_date, names.weekday_short_map[daily_panchaanga.date.get_weekday()], file=output_stream)
+    #print('raghu: ',rahu, 'yama: ',yama, 'gulika: ',gulika, file=output_stream)
 
     if m == 12 and dt == 31:
       break
-  panchdata.append(panchdict)
-  print(file=output_stream)
+    panchdata.append(copy.deepcopy(panchdict))
+    #print('\n----', panchdata,'\n----')
+    panchdict.clear()
+  #print(file=output_stream)
 
 
 def stream_daylength_based_periods(daily_panchaanga, output_stream, time_format):
@@ -210,6 +212,7 @@ def stream_daylength_based_periods(daily_panchaanga, output_stream, time_format)
   aparaahna = time.Hour(
     24 * (daily_panchaanga.day_length_based_periods.fifteen_fold_division.aparaahna.jd_start - jd)).to_string(
     format=time_format)
+  panchdict['aparaahna']=aparaahna
   aparaahna_end = time.Hour(
     24 * (daily_panchaanga.day_length_based_periods.fifteen_fold_division.aparaahna.jd_end - jd)).to_string(
     format=time_format)
@@ -236,14 +239,14 @@ def stream_daylength_based_periods(daily_panchaanga, output_stream, time_format)
   dinaanta = time.Hour(24 * (daily_panchaanga.day_length_based_periods.eight_fold_division.dinaanta.jd_start - jd)).to_string(
     format=time_format)
   panchdict['dinaanta']=dinaanta
-  print(
-    ("braahma_start:",braahma_start, "praatahsandhya_start:",praatahsandhya_start, "praatahsandhya_end:",praatahsandhya_end,
-                                                               "saangava:",saangava,
-                                                               madhyahnika_sandhya_start, madhyahnika_sandhya_end,
-                                                               madhyaahna, aparaahna, sayahna,
-                                                               sayamsandhya_start, sayamsandhya_end,
-                                                               ratriyama1, shayana_time_end, dinaanta),
-    file=output_stream)
+  # print(
+  #   ("braahma_start:",braahma_start, "praatahsandhya_start:",praatahsandhya_start, "praatahsandhya_end:",praatahsandhya_end,
+  #                                                              "saangava:",saangava,
+  #                                                              madhyahnika_sandhya_start, madhyahnika_sandhya_end,
+  #                                                              madhyaahna, aparaahna, sayahna,
+  #                                                              sayamsandhya_start, sayamsandhya_end,
+  #                                                              ratriyama1, shayana_time_end, dinaanta),
+  #   file=output_stream)
 
 
 def stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format):
@@ -261,10 +264,10 @@ def stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format):
     moonrise = '---'
   if daily_panchaanga.graha_set_jd[Graha.MOON] > daily_panchaanga.jd_next_sunrise:
     moonset = '---'
-  if daily_panchaanga.graha_rise_jd[Graha.MOON] < daily_panchaanga.graha_set_jd[Graha.MOON]:
-    print((sunrise, sunset, moonrise, moonset, midday), file=output_stream)
-  else:
-    print((sunrise, sunset, moonrise, moonset, midday), file=output_stream)
+  # if daily_panchaanga.graha_rise_jd[Graha.MOON] < daily_panchaanga.graha_set_jd[Graha.MOON]:
+  #   print((sunrise, sunset, moonrise, moonset, midday), file=output_stream)
+  # else:
+  #   print((sunrise, sunset, moonrise, moonset, midday), file=output_stream)
   panchdict['sunrise']=sunrise
   panchdict['sunset']=sunset
   panchdict['moonrise']=moonrise
@@ -297,7 +300,7 @@ def main():
   start_date = sys.argv[5]
   end_date = sys.argv[6]
   panchdata=[]
-  panchdict={}
+  #panchdict={}
   #print(sys.argv[0]," 0 ", sys.argv[1], " 1 ", sys.argv[5], " 5 ", sys.argv[6], " 6 ")
   #print("about to emit")
   compute_lagnams = False  # Default
@@ -325,6 +328,6 @@ def main():
   #with open(output_stream, 'w', newline='\n') as f_output:
    # tsv_output = csv.writer(f_output, delimiter='\t')
   dict_to_tsv(data=panchdata,filename=output_stream)
-
+  #print(panchdata)
 if __name__ == '__main__':
   main()
