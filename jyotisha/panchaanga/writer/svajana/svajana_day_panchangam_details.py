@@ -67,7 +67,7 @@ def emit(panchaanga, time_format="hh:mm", languages=None, scripts=None, output_s
   panchdict={}
   compute_lagnams = panchaanga.computation_system.festival_options.set_lagnas
   if scripts is None:
-    scripts = [sanscript.iast]
+    scripts = [sanscript.HK]
   if languages is None:
     languages = ['sa']
  # print("after compute_lagnams")
@@ -274,17 +274,31 @@ def stream_sun_moon_rise_data(daily_panchaanga, output_stream, time_format):
   panchdict['moonset']=moonset
   panchdict['midday']=midday  
   
-
 def print_festivals_to_stream(daily_panchaanga, output_stream, panchaanga, languages, scripts):
   rules_collection = rules.RulesCollection.get_cached(
     repos_tuple=tuple(panchaanga.computation_system.festival_options.repos), julian_handling=panchaanga.computation_system.festival_options.julian_handling)
   fest_details_dict = rules_collection.name_to_rule
-  print(
-    [(languages, scripts, Timezone(timezone_id=panchaanga.city.timezone),
-                fest_details_dict, daily_panchaanga.date) for f in
-     sorted(daily_panchaanga.festival_id_to_instance.values())], file=output_stream)
-
-
+  tmpfest=[]
+  for f in sorted(daily_panchaanga.festival_id_to_instance.values()):
+    fest1=md_code(f, languages=languages, scripts=scripts, timezone=panchaanga.city.get_timezone_obj(),
+                fest_details_dict=fest_details_dict, header_md="")
+    tmpfest.append(fest1)
+  panchdict['utsava']="\n\r".join(tmpfest)
+  print (" ".join(tmpfest)  )
+def md_code(self1, languages, scripts, timezone, fest_details_dict, header_md):
+    title = self1.get_full_title(languages=languages, scripts=scripts, fest_details_dict=fest_details_dict)
+    heading = "%s %s" % (header_md, title)
+    if self1.interval is None or  not self1._show_interval():
+      md = heading
+    else:
+      start_time_str = "" if self1.interval.jd_start is None else timezone.julian_day_to_local_time(self1.interval.jd_start).get_hour_str()
+      end_time_str = "" if self1.interval.jd_end is None else timezone.julian_day_to_local_time(self1.interval.jd_end).get_hour_str()
+      md = "%s %s→%s" % (heading, start_time_str, end_time_str)
+      # description = get_description(festival_instance=self, fest_details_dict=fest_details_dict, script=scripts[0], truncate=False, header_md="#" + header_md)
+      # if description != "":
+      #   md = "%s\n\n%s" % (md, description)
+    return md
+ 
 def set_top_content(output_stream, panchaanga, samvatsara_names, scripts, year):
   print( year, file=output_stream)
   print( jyotisha.custom_transliteration.tr(samvatsara_names[0],'hk',titled=True,source_script=sanscript.brahmic.DEVANAGARI), 
